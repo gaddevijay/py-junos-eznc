@@ -1112,6 +1112,7 @@ class Device(_Connection):
             if "grpc_deps" not in kwargs:
                 raise ValueError
             from jnpr.junos.dcs import DCS
+
             instance = object.__new__(DCS, *args, **kwargs)
             instance.__init__(**kwargs)
             return instance
