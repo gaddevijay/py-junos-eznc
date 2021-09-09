@@ -10,3 +10,4 @@ pyserial
 yamlloader
 pyparsing
 transitions
+setuptools-rust
