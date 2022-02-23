@@ -11,3 +11,4 @@ yamlloader
 pyparsing
 transitions
 setuptools-rust
+confluent-kafka==1.8.2
