@@ -161,7 +161,9 @@ class TestSW(unittest.TestCase):
         dev.facts = facts
         sw = SW(dev)
         sw.put(package="test.tgz")
-        self.assertTrue(call("test.tgz", "/var/tmp") in mock_ftp_put.mock_calls)
+        self.assertTrue(
+            any("('test.tgz', '/var/tmp')" in str(s) for s in mock_ftp_put.mock_calls)
+        )
 
     @patch("jnpr.junos.utils.scp.SCP.__exit__")
     @patch("jnpr.junos.utils.scp.SCP.__init__")
@@ -672,8 +674,27 @@ class TestSW(unittest.TestCase):
         self.assertTrue(self.sw.install("file", no_copy=True)[0])
 
     @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_sw_install_multi_vc_member_id(self, mock_pkgadd):
+        mock_pkgadd.return_value = True, "msg"
+        self.dev.facts["vc_master"] = '0'
+        self.sw._multi_RE = True
+        self.sw._multi_VC = True
+        self.sw._RE_list = ("version_RE0", "version_RE1")
+        self.assertTrue(self.sw.install("file", member_id=['1'], no_copy=True)[0])
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_sw_install_multi_vc_multiple_member_id(self, mock_pkgadd):
+        mock_pkgadd.return_value = True, "msg"
+        self.dev.facts["vc_master"] = '0'
+        self.sw._multi_RE = False
+        self.sw._multi_VC_nsync = True
+        self.sw._RE_list = ("version_RE0", "version_RE1")
+        self.assertTrue(self.sw.install("file", member_id=['0','1'], no_copy=True)[0])
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
     def test_sw_install_mixed_vc(self, mock_pkgadd):
         mock_pkgadd.return_value = True
+        self.dev.facts["vc_master"] = '0'
         self.sw._mixed_VC = True
         self.sw._RE_list = ("version_RE0", "version_RE1")
         self.assertTrue(self.sw.install(pkg_set=["abc.tgz", "pqr.tgz"], no_copy=True))

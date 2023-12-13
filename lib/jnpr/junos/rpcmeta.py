@@ -6,7 +6,6 @@ from jnpr.junos import jxml as JXML
 
 
 class _RpcMetaExec(object):
-
     # -----------------------------------------------------------------------
     # CONSTRUCTOR
     # -----------------------------------------------------------------------
@@ -91,7 +90,7 @@ class _RpcMetaExec(object):
                  options={'database':'committed','inherit':'inherit'})
 
         :param str model: Can provide yang model openconfig/custom/ietf. When
-                model is True and filter_xml is None, xml is enclosed under
+                model is True (filter_xml option is not supported), xml is enclosed under
                 <data> so that we get junos as well as other model
                 configurations
 
@@ -154,7 +153,7 @@ class _RpcMetaExec(object):
             self._junos.transform = transform
         # in case of model provided top level should be data
         # return response
-        if model and filter_xml is None and options.get("format") is not "json":
+        if model and filter_xml is None and options.get("format") != "json":
             response = response.getparent()
             response.tag = "data"
         return response
