@@ -329,7 +329,7 @@ class JSONLoadError(Exception):
         self.ex_msg = str(exception)
         self.rpc_content = rpc_content
         self.offending_line = ""
-        obj = re.search("line (\d+)", self.ex_msg)
+        obj = re.search(r"line (\d+)", self.ex_msg)
         if obj:
             line_no = int(obj.group(1))
             rpc_lines = rpc_content.splitlines()
@@ -365,5 +365,38 @@ class DCSRpcError(RpcError):
 
     def __repr__(self):
         return "error-code: '{}' error: '{}'".format(self.error_code_name, self.error)
+
+    __str__ = __repr__
+
+
+class OCTermRpcError(RpcError):
+    """
+    Generated if error is returned from DCS RPC Execution
+    """
+
+    def __init__(self, cmd, error, uuid=None):
+        self.error = error
+        self.uuid = uuid
+        errs = "error: '{}'".format(error)
+        RpcError.__init__(self, cmd=cmd, errs=errs)
+
+    def __repr__(self):
+        return "error: '{}'".format(self.error)
+
+    __str__ = __repr__
+
+
+class OCTermProducer(RpcError):
+    """
+    Generated if message is published to kafka topic
+    """
+
+    def __init__(self, cmd, error, uuid=None):
+        self.error = error
+        self.uuid = uuid
+        RpcError.__init__(self, cmd=cmd, errs=error)
+
+    def __repr__(self):
+        return "error: '{}'".format(self.error)
 
     __str__ = __repr__
