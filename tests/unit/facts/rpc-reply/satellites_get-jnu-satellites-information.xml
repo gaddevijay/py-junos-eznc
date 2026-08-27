@@ -1,0 +1,16 @@
+<rpc-reply xmlns:junos="http://xml.juniper.net/junos/26.3I20260309_1406_babud/junos">
+    <jnu-satellites-information>
+        <satellite-information>
+            <satellite-ip>satellite_one</satellite-ip>
+            <alive>up</alive>
+            <satellite-model>mx960</satellite-model>
+            <satellite-version>26.3I20260309_1406_babud</satellite-version>
+        </satellite-information>
+        <satellite-information>
+            <satellite-ip>satellite_two</satellite-ip>
+            <alive>up</alive>
+            <satellite-model>mx960</satellite-model>
+            <satellite-version>26.3I20260309_1406_babud</satellite-version>
+        </satellite-information>
+    </jnu-satellites-information>
+</rpc-reply>

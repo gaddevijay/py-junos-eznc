@@ -5,14 +5,14 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from nose.plugins.attrib import attr
+
 import importlib
 import sys
 
 import jnpr.junos.facts
+import nose2
 
 
-@attr("unit")
 class TestFactInitialization(unittest.TestCase):
     def test_duplicate_facts(self):
         module = importlib.import_module("tests.unit.facts.dupe_foo1")

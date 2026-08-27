@@ -2,23 +2,23 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from nose.plugins.attrib import attr
-from mock import MagicMock, patch, mock_open, call
-import os
-from lxml import etree
-import sys
+
 import json
+import os
+import sys
+from unittest.mock import MagicMock, call, mock_open, patch
 
-from ncclient.manager import Manager, make_device_handler
-from ncclient.transport import SSHSession
 import ncclient.transport.errors as NcErrors
-from ncclient.operations import RPCError, TimeoutExpiredError
-
-from jnpr.junos.facts.swver import version_info
+import nose2
 from jnpr.junos import Device
-from jnpr.junos.exception import RpcError
 from jnpr.junos import exception as EzErrors
 from jnpr.junos.console import Console
+from jnpr.junos.exception import RpcError
+from jnpr.junos.facts.swver import version_info
+from lxml import etree
+from ncclient.manager import Manager, make_device_handler
+from ncclient.operations import RPCError, TimeoutExpiredError
+from ncclient.transport import SSHSession
 
 __author__ = "Rick Sherman, Nitin Kumar, Stacy Smith"
 __credits__ = "Jeremy Schulman"
@@ -44,7 +44,7 @@ facts = {
     "model": "FIREFLY-PERIMETER",
     "RE0": {
         "status": "Testing",
-        "last_reboot_reason": "Router rebooted after a " "normal shutdown.",
+        "last_reboot_reason": "Router rebooted after a normal shutdown.",
         "model": "FIREFLY-PERIMETER RE",
         "up_time": "6 hours, 29 minutes, 30 seconds",
     },
@@ -53,7 +53,6 @@ facts = {
 }
 
 
-@attr("unit")
 class Test_MyTemplateLoader(unittest.TestCase):
     def setUp(self):
         from jnpr.junos.device import _MyTemplateLoader
@@ -78,7 +77,6 @@ class Test_MyTemplateLoader(unittest.TestCase):
             self.template_loader.get_source(None, None)
 
 
-@attr("unit")
 class TestDevice(unittest.TestCase):
     @patch("ncclient.manager.connect")
     def setUp(self, mock_connect):
@@ -119,7 +117,7 @@ class TestDevice(unittest.TestCase):
         mock_manager.connect.side_effect = NcErrors.SSHError(
             "Could not open socket to 1.1.1.1:830"
         )
-        from datetime import timedelta, datetime
+        from datetime import datetime, timedelta
 
         currenttime = datetime.now()
         mock_datetime.datetime.now.side_effect = [
@@ -133,7 +131,7 @@ class TestDevice(unittest.TestCase):
     def test_device_diff_err_message(self, mock_datetime, mock_manager):
         NcErrors.SSHError.message = "why are you trying :)"
         mock_manager.connect.side_effect = NcErrors.SSHError
-        from datetime import timedelta, datetime
+        from datetime import datetime, timedelta
 
         currenttime = datetime.now()
         mock_datetime.datetime.now.side_effect = [
@@ -311,7 +309,7 @@ class TestDevice(unittest.TestCase):
         mock_warn.assert_has_calls(
             [
                 call.warn(
-                    "fact-style old will be removed " "in a future release.",
+                    "fact-style old will be removed in a future release.",
                     RuntimeWarning,
                 )
             ]
@@ -396,7 +394,7 @@ class TestDevice(unittest.TestCase):
         mock_warn.assert_has_calls(
             [
                 call.warn(
-                    "fact-style old will be removed " "in a future release.",
+                    "fact-style old will be removed in a future release.",
                     RuntimeWarning,
                 )
             ]
@@ -420,6 +418,7 @@ class TestDevice(unittest.TestCase):
         Device.ON_JUNOS = True
         localdev = Device()
         self.assertEqual(localdev._hostname, "localhost")
+        Device.ON_JUNOS = False
 
     @patch("jnpr.junos.device.os")
     @patch(builtin_string + ".open")
@@ -466,6 +465,23 @@ class TestDevice(unittest.TestCase):
 
     @patch("ncclient.manager.connect")
     @patch("jnpr.junos.Device.execute")
+    def test_device_open_with_bind_addr(self, mock_connect, mock_execute):
+        with patch("jnpr.junos.utils.fs.FS.cat") as mock_cat:
+            mock_cat.return_value = """
+
+    domain jls.net
+
+            """
+            mock_connect.side_effect = self._mock_manager
+            mock_execute.side_effect = self._mock_manager
+            self.dev2 = Device(
+                host="2.2.2.2", user="test", password="password123", bind_addr="1.1.1.1"
+            )
+            self.dev2.open()
+            self.assertEqual(self.dev2.connected, True)
+
+    @patch("ncclient.manager.connect")
+    @patch("jnpr.junos.Device.execute")
     def test_device_open_with_look_for_keys_False(self, mock_connect, mock_execute):
         with patch("jnpr.junos.utils.fs.FS.cat") as mock_cat:
             mock_cat.return_value = """
@@ -475,7 +491,9 @@ class TestDevice(unittest.TestCase):
             """
             mock_connect.side_effect = self._mock_manager
             mock_execute.side_effect = self._mock_manager
-            self.dev2 = Device(host="2.2.2.2", user="test", password="password123", look_for_keys=False)
+            self.dev2 = Device(
+                host="2.2.2.2", user="test", password="password123", look_for_keys=False
+            )
             self.dev2.open()
             self.assertEqual(self.dev2.connected, True)
 
@@ -490,9 +508,247 @@ class TestDevice(unittest.TestCase):
             """
             mock_connect.side_effect = self._mock_manager
             mock_execute.side_effect = self._mock_manager
-            self.dev2 = Device(host="2.2.2.2", user="test", password="password123", look_for_keys=True)
+            self.dev2 = Device(
+                host="2.2.2.2", user="test", password="password123", look_for_keys=True
+            )
             self.dev2.open()
             self.assertEqual(self.dev2.connected, True)
+
+    @patch("ncclient.manager.connect")
+    @patch("jnpr.junos.Device.execute")
+    def test_device_open_with_hostkey_verify_True(self, mock_connect, mock_execute):
+        with patch("jnpr.junos.utils.fs.FS.cat") as mock_cat:
+            mock_cat.return_value = """
+
+    domain jls.net
+
+            """
+            mock_connect.side_effect = self._mock_manager
+            mock_execute.side_effect = self._mock_manager
+            self.dev2 = Device(
+                host="2.2.2.2", user="test", password="password123", hostkey_verify=True
+            )
+            self.dev2.open()
+            self.assertEqual(self.dev2.connected, True)
+
+    @patch("ncclient.manager.connect")
+    @patch("jnpr.junos.Device.execute")
+    def test_device_open_with_hostkey_verify_False(self, mock_connect, mock_execute):
+        with patch("jnpr.junos.utils.fs.FS.cat") as mock_cat:
+            mock_cat.return_value = """
+
+    domain jls.net
+
+            """
+            mock_connect.side_effect = self._mock_manager
+            mock_execute.side_effect = self._mock_manager
+            self.dev2 = Device(
+                host="2.2.2.2",
+                user="test",
+                password="password123",
+                hostkey_verify=False,
+            )
+            self.dev2.open()
+            self.assertEqual(self.dev2.connected, True)
+
+    @patch("ncclient.manager.connect")
+    @patch("jnpr.junos.Device.execute")
+    def test_device_open_with_proxy_command(self, mock_connect, mock_execute):
+        with (
+            patch("jnpr.junos.utils.fs.FS.cat") as mock_cat,
+            patch("paramiko.proxy.ProxyCommand") as mock_proxy,
+        ):
+            mock_cat.return_value = "\n    domain jls.net\n"
+            mock_connect.side_effect = self._mock_manager
+            mock_execute.side_effect = self._mock_manager
+            mock_sock = MagicMock()
+            mock_proxy.return_value = mock_sock
+            self.dev2 = Device(
+                host="2.2.2.2",
+                user="test",
+                password="password123",
+                proxy_command="ssh -W %h:%p jump-host",
+            )
+            self.dev2.open()
+            mock_proxy.assert_called_once_with("ssh -W 2.2.2.2:830 jump-host")
+            _, connect_kwargs = mock_execute.call_args
+            self.assertEqual(connect_kwargs["sock"], mock_sock)
+
+    @patch("ncclient.manager.connect")
+    @patch("jnpr.junos.Device.execute")
+    def test_device_open_with_proxy_command_empty_string(
+        self, mock_connect, mock_execute
+    ):
+        with (
+            patch("jnpr.junos.utils.fs.FS.cat") as mock_cat,
+            patch("paramiko.proxy.ProxyCommand") as mock_proxy,
+        ):
+            mock_cat.return_value = "\n    domain jls.net\n"
+            mock_connect.side_effect = self._mock_manager
+            mock_execute.side_effect = self._mock_manager
+            self.dev2 = Device(
+                host="2.2.2.2",
+                user="test",
+                password="password123",
+                proxy_command="",
+            )
+            self.dev2.open()
+            mock_proxy.assert_not_called()
+            _, connect_kwargs = mock_execute.call_args
+            self.assertIsNone(connect_kwargs["sock"])
+
+    # ------------------------------------------------------------------
+    # Hostname validation tests (security fix: argument-injection guard)
+    # ------------------------------------------------------------------
+
+    def test_device_host_valid_ipv4(self):
+        # Plain IPv4 address must be accepted without raising.
+        dev = Device(
+            host="192.168.1.1", user="test", password="password123", gather_facts=False
+        )
+        self.assertEqual(dev._hostname, "192.168.1.1")
+
+    def test_device_host_valid_fqdn(self):
+        # Typical FQDN with dots and hyphens must be accepted.
+        dev = Device(
+            host="router.example.com",
+            user="test",
+            password="password123",
+            gather_facts=False,
+        )
+        self.assertEqual(dev._hostname, "router.example.com")
+
+    def test_device_host_valid_single_label(self):
+        # Single alphanumeric label (e.g. bare hostname) must be accepted.
+        dev = Device(
+            host="router1", user="test", password="password123", gather_facts=False
+        )
+        self.assertEqual(dev._hostname, "router1")
+
+    def test_device_host_valid_ipv6_bracketed(self):
+        # Bracketed IPv6 literal must be accepted.
+        dev = Device(
+            host="[2001:db8::1]",
+            user="test",
+            password="password123",
+            gather_facts=False,
+        )
+        self.assertEqual(dev._hostname, "[2001:db8::1]")
+
+    def test_device_host_valid_ipv6_loopback(self):
+        # Bracketed IPv6 loopback must be accepted.
+        dev = Device(
+            host="[::1]", user="test", password="password123", gather_facts=False
+        )
+        self.assertEqual(dev._hostname, "[::1]")
+
+    def test_device_host_invalid_whitespace_injection(self):
+        # Hostname with embedded space must be rejected at construction
+        # (core argument-injection vector from the security report).
+        with self.assertRaises(ValueError):
+            Device(
+                host="valid.host -oProxyCommand=touch /tmp/pwned",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_invalid_backslash_space_injection(self):
+        # Backslash-escaped space variant must also be rejected.
+        with self.assertRaises(ValueError):
+            Device(
+                host=r"valid.host:22 -oProxyCommand=touch\ /tmp/pwned",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_invalid_leading_hyphen(self):
+        # A hostname starting with a hyphen looks like an option flag to ssh.
+        with self.assertRaises(ValueError):
+            Device(
+                host="-oProxyCommand=id",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_invalid_semicolon(self):
+        # Shell metacharacter ; must be rejected.
+        with self.assertRaises(ValueError):
+            Device(
+                host="host;rm -rf /",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_invalid_backtick(self):
+        # Backtick command substitution must be rejected.
+        with self.assertRaises(ValueError):
+            Device(
+                host="host`id`",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_invalid_dollar_sign(self):
+        # Dollar-sign variable expansion must be rejected.
+        with self.assertRaises(ValueError):
+            Device(
+                host="$(id)",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_invalid_colon_port_suffix(self):
+        # host:port notation must be rejected (port belongs in the 'port' kwarg).
+        with self.assertRaises(ValueError):
+            Device(
+                host="router.example.com:22",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+
+    def test_device_host_none_with_sock_fd_allowed(self):
+        # host=None is valid for outbound-SSH (sock_fd) connections and must
+        # not be rejected by the hostname validator.
+        dev = Device(sock_fd=6, user="test", password="password123")
+        self.assertIsNone(dev._hostname)
+
+    def test_device_host_invalid_raises_value_error_not_other(self):
+        # Confirm the exception type is exactly ValueError (not ConnectError
+        # or any other exception class).
+        with self.assertRaises(ValueError) as ctx:
+            Device(
+                host="bad host",
+                user="test",
+                password="password123",
+                gather_facts=False,
+            )
+        self.assertIn("Invalid 'host' value", str(ctx.exception))
+
+    @patch("ncclient.manager.connect")
+    @patch("jnpr.junos.Device.execute")
+    def test_device_host_invalid_no_subprocess_spawned(
+        self, mock_connect, mock_execute
+    ):
+        # Verify that a malicious hostname raises BEFORE any ProxyCommand
+        # subprocess is spawned — i.e. the error fires at Device() time,
+        # not at .open() time.
+        with patch("paramiko.proxy.ProxyCommand") as mock_proxy:
+            with self.assertRaises(ValueError):
+                Device(
+                    host=r"valid.host -oProxyCommand=touch\ /tmp/pwned",
+                    user="test",
+                    password="password123",
+                    proxy_command="ssh -W %h:%p jump-host",
+                    gather_facts=False,
+                )
+            mock_proxy.assert_not_called()
 
     @patch("ncclient.manager.connect")
     @patch("jnpr.junos.Device.execute")
@@ -704,7 +960,7 @@ class TestDevice(unittest.TestCase):
     def test_device_cli_output_warning(self, mock_warnings, mock_execute):
         mock_execute.side_effect = self._mock_manager
         data = self.dev.cli(
-            "show interfaces ge-0/0/0.0 routing-instance " "all media", format="xml"
+            "show interfaces ge-0/0/0.0 routing-instance all media", format="xml"
         )
         ip = data.findtext(
             'logical-interface[name="ge-0/0/0.0"]/'
@@ -854,7 +1110,7 @@ class TestDevice(unittest.TestCase):
         with patch("jnpr.junos.device.socket"):
             self.assertTrue(
                 self.dev.probe(1),
-                "probe fn is not working for" " timeout greater than zero",
+                "probe fn is not working for timeout greater than zero",
             )
 
     def test_device_probe_timeout_exception(self):

@@ -1,12 +1,12 @@
 # stdlib
-from functools import wraps
 import re
 import sys
+from functools import wraps
 
+from jnpr.junos import jxml as JXML
 from lxml import etree
 from ncclient.operations.rpc import RPCError
 from ncclient.xml_ import NCElement
-from jnpr.junos import jxml as JXML
 
 
 def timeoutDecorator(function):
@@ -123,10 +123,7 @@ def ignoreWarnDecorator(function):
                     errors = [ex]
                 for err in errors:
                     if err.severity == "warning":
-                        if (
-                            sys.version < "3"
-                            and isinstance(ignore_warning, (str, unicode))
-                        ) or (sys.version >= "3" and isinstance(ignore_warning, str)):
+                        if isinstance(ignore_warning, str):
                             if not re.search(ignore_warning, err.message, re.I):
                                 # Message did not match.
                                 raise ex

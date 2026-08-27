@@ -1,13 +1,12 @@
-import unittest
-from nose.plugins.attrib import attr
 import ftplib
-import sys
 import os
+import sys
+import unittest
+from unittest.mock import patch
 
-from jnpr.junos import Device
 import jnpr.junos.utils.ftp
-
-from mock import patch
+import nose2
+from jnpr.junos import Device
 
 if sys.version < "3":
     builtin_string = "__builtin__"
@@ -15,7 +14,6 @@ else:
     builtin_string = "builtins"
 
 
-@attr("unit")
 @unittest.skipIf(sys.platform == "win32", "will work for windows in coming days")
 class TestFtp(unittest.TestCase):
     @patch("ftplib.FTP.connect")

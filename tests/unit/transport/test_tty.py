@@ -5,14 +5,13 @@ try:
 except ImportError:
     import unittest
 
-from nose.plugins.attrib import attr
-from mock import MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from jnpr.junos.transport.tty import Terminal
+import nose2
 from jnpr.junos import exception as EzErrors
+from jnpr.junos.transport.tty import Terminal
 
 
-@attr("unit")
 class TestTTY(unittest.TestCase):
     def setUp(self):
         logging.getLogger("jnpr.junos.tty")
@@ -30,6 +29,7 @@ class TestTTY(unittest.TestCase):
         self.terminal.read_prompt = MagicMock()
         self.terminal.read_prompt.return_value = (None, "badpasswd")
         self.terminal.write = MagicMock()
+        self.terminal._tty_close = MagicMock()
         self.assertRaises(EzErrors.ConnectAuthError, self.terminal._login_state_machine)
 
     @patch("jnpr.junos.transport.tty.sleep")

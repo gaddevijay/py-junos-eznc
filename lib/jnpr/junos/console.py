@@ -1,25 +1,21 @@
-import traceback
-import sys
 import logging
-import warnings
 import socket
+import sys
+import traceback
+import warnings
 
-# 3rd-party packages
-from ncclient.devices.junos import JunosDeviceHandler
-from lxml import etree
-from jnpr.junos.transport.tty_telnet import Telnet
+from jnpr.junos import jxml as JXML
+from jnpr.junos.decorators import ignoreWarnDecorator
+from jnpr.junos.device import _Connection, _Jinja2ldr
+from jnpr.junos.factcache import _FactCache
+from jnpr.junos.ofacts import *
+from jnpr.junos.rpcmeta import _RpcMetaExec
 from jnpr.junos.transport.tty_serial import Serial
 from jnpr.junos.transport.tty_ssh import SSH
+from jnpr.junos.transport.tty_telnet import Telnet
+from lxml import etree
+from ncclient.devices.junos import JunosDeviceHandler
 from ncclient.xml_ import NCElement
-from jnpr.junos.device import _Connection
-
-# local modules
-from jnpr.junos.rpcmeta import _RpcMetaExec
-from jnpr.junos.factcache import _FactCache
-from jnpr.junos import jxml as JXML
-from jnpr.junos.ofacts import *
-from jnpr.junos.decorators import ignoreWarnDecorator
-from jnpr.junos.device import _Jinja2ldr
 
 logger = logging.getLogger("jnpr.junos.console")
 
@@ -114,6 +110,7 @@ class Console(_Connection):
         self._attempts = kvargs.get("attempts", 10)
         self._gather_facts = kvargs.get("gather_facts", False)
         self._fact_style = kvargs.get("fact_style", "new")
+        self._use_filter = False
         self._huge_tree = kvargs.get("huge_tree", False)
         if self._fact_style != "new":
             warnings.warn(
@@ -195,7 +192,7 @@ class Console(_Connection):
         if self.cs_user is not None and self.cs_passwd is None:
             self.results["failed"] = True
             self.results["errmsg"] = (
-                "ERROR: Console SSH, Password-less connection is " "not supported !!!"
+                "ERROR: Console SSH, Password-less connection is not supported !!!"
             )
             logger.error(self.results["errmsg"])
             return self.results

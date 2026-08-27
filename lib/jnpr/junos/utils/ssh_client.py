@@ -1,4 +1,5 @@
 import paramiko
+from typing import Any, Dict
 
 
 def open_ssh_client(dev):
@@ -13,27 +14,40 @@ def open_ssh_client(dev):
     # note, the following code was extracted from the scp module, and then the scp module
     # was refactored to use this function
     ssh_client = paramiko.SSHClient()
-    ssh_client.load_system_host_keys()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    if dev._hostkey_verify:
+        ssh_client.load_system_host_keys()
+    else:
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     # use junos._hostname since this will be correct if we are going
     # through a jumphost.
 
-    config = {}
-    kwargs = {}
+    config: Dict[str, Any] = {}
+    kwargs: Dict[str, Any] = {}
     ssh_config = getattr(dev, "_sshconf_path")
     if ssh_config:
-        config = paramiko.SSHConfig()
+        ssh_cfg_obj = paramiko.SSHConfig()
         with open(ssh_config) as open_ssh_config:
-            config.parse(open_ssh_config)
-        config = config.lookup(dev._hostname)
+            ssh_cfg_obj.parse(open_ssh_config)
+        config = ssh_cfg_obj.lookup(dev._hostname)
 
     sock = None
-    if config.get("proxycommand"):
-        sock = paramiko.proxy.ProxyCommand(config.get("proxycommand"))
+    proxy_cmd = config.get("proxycommand")
+    if proxy_cmd:
+        sock = paramiko.proxy.ProxyCommand(proxy_cmd)
 
     if dev._ssh_private_key_file is not None:
         kwargs["key_filename"] = dev._ssh_private_key_file
+
+    if dev._allow_agent is not None:
+        kwargs["allow_agent"] = dev._allow_agent
+    else:
+        kwargs["allow_agent"] = bool(
+            (dev._auth_password is None) and (dev._ssh_private_key_file is None)
+        )
+
+    if dev._look_for_keys is not None:
+        kwargs["look_for_keys"] = dev._look_for_keys
 
     # pick hostname from .ssh config if any
     hostname = config.get("hostname", dev._hostname)
@@ -48,6 +62,6 @@ def open_ssh_client(dev):
         username=dev._auth_user,
         password=dev._auth_password,
         sock=sock,
-        **kwargs
+        **kwargs,
     )
     return ssh_client

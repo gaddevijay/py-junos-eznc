@@ -1,14 +1,10 @@
 import warnings
 from pprint import pformat
+from collections.abc import MutableMapping
 
-try:
-    from collections.abc import MutableMapping
-except ImportError:
-    from collections import MutableMapping
-
+import jnpr.junos.exception
 import jnpr.junos.facts
 from jnpr.junos.facts import __doc__ as facts_doc
-import jnpr.junos.exception
 
 
 class _FactCache(MutableMapping):
@@ -299,9 +295,8 @@ class _FactCache(MutableMapping):
                 self._should_warn = False
 
     # In case optimization flag is enabled, it strips of docstring and __doc__ becomes None
-    if __doc__ is None:
-        __doc__ = ""
+    _class_doc: str = __doc__ or ""
 
     # Precede the class's documentation with the documentation on the specific
     # facts from  the jnpr.junos.facts package.
-    __doc__ = facts_doc + "Implementation details on the _FactCache class:" + __doc__
+    __doc__ = facts_doc + "Implementation details on the _FactCache class:" + _class_doc

@@ -1,19 +1,17 @@
 __author__ = "Nitin Kumar, Rick Sherman"
 __credits__ = "Jeremy Schulman"
 
-import unittest
-from nose.plugins.attrib import attr
-from mock import patch
 import os
+import unittest
+from unittest.mock import patch
 
+import nose2
 from jnpr.junos import Device
 from jnpr.junos.ofacts.srx_cluster import facts_srx_cluster as srx_cluster
-
 from ncclient.manager import Manager, make_device_handler
 from ncclient.transport import SSHSession
 
 
-@attr("unit")
 class TestSrxCluster(unittest.TestCase):
     @patch("ncclient.manager.connect")
     @patch("jnpr.junos.device.warnings")

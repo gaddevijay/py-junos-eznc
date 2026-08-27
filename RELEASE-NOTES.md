@@ -1,3 +1,98 @@
+## Release 2.8.2 - 22 Jun 2026
+## Features Added
+- Gather facts for the satellite devices
+## Bugs Fixed
+- Updated the SW install output messages in the progress callback
+
+## Release 2.8.1 - 1 Jun 2026
+## Features Added
+- Upgraded Jinja2 version 3.1.6
+## Bugs Fixed
+- Modified the eval operation to use the safe_eval operation in the PyEZ table view, addressing security vulnerabilities
+- Added hostname validation before substituting the hostname in the proxy_command
+
+## Release 2.8.0 - 19 May 2026
+## Features Added
+- Added support for routing instances and satellite options in `sw.install()` (#1403)
+- Introduced support for the `proxy_command` parameter (#1401)
+- Enabled the "request vmhost zeroize" functionality (#1372)
+## Bugs Fixed
+- Replaced the deprecated `setParseAction` with `set_parse_action` (#1399)
+- Fixed an issue where `allow_agent` and `look_for_keys` parameters were not being
+honored by `ssh_client` (#1405)
+- Revised `SECURITY.md` for improved clarity on updates and reporting (#1402)
+- Added support for issue and pull request templates for different types of issues:
+Bug, Feature, Task, and Security (#1407)
+
+## Release 2.7.6 - 16 Jan 2026
+- Python 3.12+ Support: Added official support for Python 3.12 and later versions,
+ensuring compatibility with the latest Python ecosystems (#1382)
+- SSH Agent Support: Added the allow_agent parameter support
+to improve flexible authentication workflows (#1385, #1285, #1353)
+- Enhanced Type Hinting: Updated type hinting throughout
+- junos-eznc for better IDE integration and static analysis (#1392)
+- Formatter Migration: Adopted Ruff for faster,
+more reliable code formatting (#1391).
+- Dependency Update: Migrated from yamlordereddictloader
+to yamlloader for improved YAML processing (#1390)
+- CI/CD Enhancements: Updated GitHub Actions to validate all supported
+Python versions against PyEZ, ensuring broader stability (#1389)
+## Bugs Fixed
+None
+
+## Release 2.7.5 - 22 Sep 2025
+## Features Added
+- Support for ncclient 0.7.0
+## Bugs Fixed
+None
+
+## Release 2.7.4 - 30 Apr 2025
+## Features Added
+None
+## Bugs Fixed
+- Fixed import error related to OspfNeighborTable #1365
+- Fixed Virtual chassis member upgrade issue #1368
+- To support EVO system reboot #1371
+- EVO dual RE upgrade support #1373
+
+## Release 2.7.3 - 14 Feb 2025
+## Features Added
+- Introduced vmhost paramater for show vmhost version in dev.facts #1355
+
+## Bugs Fixed
+- Fixed napalm get_interfaces returns empty list #1354
+- Fixed sw.reboot to handle when member_id is not set #1351
+
+## Release 2.7.2 - 23 OCT 2024
+## Features Added
+- Introduced bind_addr parameter in Device() API #1279
+- Introduced vmhost paramater in dev.facts #1333
+- Introduced hostkey_verify paramater in Device() API #1321
+- Updated Docker file to use the latest Alpine #1316
+
+## Bugs Fixed
+
+- Fixed the missing key to EthernetSwitchingTable #1228
+- Fixed error handling on HelloHandler #1339
+- Fixed the version check #1338
+- Removed Google and Stackflow link from the ReadME #1337
+- Fixed SystemStorageTable tables and views to handles multiple routing-engine file system storage information.#1244
+- Fixed Console' object has no attribute '_use_filter' error when executed Table/View script #1335
+- Fixed cli function to get full RPC response #1315
+- Fixed sw.install to set no_validate option when validate=False for NSSU and ISSU upgrade #1323
+- Fixed UT framework mock to use built-in unittest.mock #1311
+- Fixed specific VC member reboot handling #1308 #1310
+- Supported latest paramiko version which supports aes128-gcm and aes256-gcm cipher
+
+## Release 2.7.1 - 12 APR 2024
+## Features Added
+- Added customer juniper paramiko module as a dependency  which supported aes128 and aes257 cipher #1299 
+## Bugs Fixed
+
+## Release 2.7.0 - 12 JAN 2024
+## Features Added
+-  Support added for Python 3.10 and above version
+
 ## Release 2.6.8 - 3 OCT 2023
 ## Features Added
 - Introduced optional argument routing instance for fs.cp() API

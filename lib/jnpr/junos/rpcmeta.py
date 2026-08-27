@@ -1,8 +1,9 @@
 import re
 import sys
+
+from jnpr.junos import jxml as JXML
 from lxml import etree
 from lxml.builder import E
-from jnpr.junos import jxml as JXML
 
 
 class _RpcMetaExec(object):
@@ -29,7 +30,7 @@ class _RpcMetaExec(object):
         model=None,
         namespace=None,
         remove_ns=True,
-        **kwargs
+        **kwargs,
     ):
         """
         retrieve configuration from the Junos device
@@ -90,7 +91,7 @@ class _RpcMetaExec(object):
                  options={'database':'committed','inherit':'inherit'})
 
         :param str model: Can provide yang model openconfig/custom/ietf. When
-                model is True (filter_xml option is not supported), xml is enclosed under
+                model is True and filter_xml is None, xml is enclosed under
                 <data> so that we get junos as well as other model
                 configurations
 
@@ -139,7 +140,7 @@ class _RpcMetaExec(object):
                 if model is not None or namespace is not None:
                     if model == "custom" and namespace is None:
                         raise AttributeError(
-                            'For "custom" model, ' 'explicitly provide "namespace"'
+                            'For "custom" model, explicitly provide "namespace"'
                         )
                     ns = namespace or (nmspaces.get(model.lower()) + filter_xml.tag)
                     filter_xml.attrib["xmlns"] = ns
@@ -335,10 +336,7 @@ class _RpcMetaExec(object):
                     if not isinstance(arg_value, (tuple, list)):
                         arg_value = [arg_value]
                     for a in arg_value:
-                        if not isinstance(
-                            a,
-                            (bool, str, unicode) if sys.version < "3" else (bool, str),
-                        ):
+                        if not isinstance(a, (bool, str)):
                             raise TypeError(
                                 "The value %s for argument %s"
                                 " is of %s. Argument "

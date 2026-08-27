@@ -1,11 +1,12 @@
-from select import select
-import re
 import datetime
-from jnpr.junos.utils.ssh_client import open_ssh_client
+import re
 import subprocess
-import six
-from threading import Thread
 import time
+from select import select
+from threading import Thread
+
+import six
+from jnpr.junos.utils.ssh_client import open_ssh_client
 
 _JUNOS_PROMPT = "> "
 _SHELL_PROMPT = r"(%|#|\$)\s"
@@ -14,7 +15,6 @@ _RECVSZ = 1024
 
 
 class StartShell(object):
-
     """
     Junos shell execution utility.  This utility is written to
     support the "context manager" design pattern.  For example::
@@ -84,7 +84,8 @@ class StartShell(object):
             if isinstance(data, bytes):
                 data = data.decode("utf-8", "replace")
             got.append(data)
-            if this is not None and re.search(r"{}\s?$".format(this), data):
+
+            if this is not None and re.search(r"{}\s?$".format(this), str(data)):
                 break
         return got
 
@@ -119,7 +120,7 @@ class StartShell(object):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 close_fds=1,
-                bufsize=1,
+                bufsize=0,
             )
         else:
             self._client = open_ssh_client(dev=self._nc)
@@ -134,10 +135,13 @@ class StartShell(object):
         """Close the SSH client channel"""
 
         if self.ON_JUNOS is True:
-            self._chan.terminate()
+            if self._chan is not None:
+                self._chan.terminate()
         else:
-            self._chan.close()
-            self._client.close()
+            if self._chan is not None:
+                self._chan.close()
+            if self._client is not None:
+                self._client.close()
 
     def run(self, command, this=_SHELL_PROMPT, timeout=0, sleep=0):
         """

@@ -1,22 +1,26 @@
 from __future__ import print_function
+
 import os
 import sys
+
 from six import StringIO
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from nose.plugins.attrib import attr
+
 from contextlib import contextmanager
+from unittest.mock import MagicMock, call, mock_open, patch
+
+import nose2
 from jnpr.junos import Device
-from jnpr.junos.exception import RpcError, SwRollbackError, RpcTimeoutError
-from jnpr.junos.utils.sw import SW
+from jnpr.junos.exception import RpcError, RpcTimeoutError, SwRollbackError
 from jnpr.junos.facts.swver import version_info
+from jnpr.junos.utils.sw import SW
+from lxml import etree
 from ncclient.manager import Manager, make_device_handler
 from ncclient.transport import SSHSession
-from lxml import etree
-from mock import patch, MagicMock, call, mock_open
 
 if sys.version < "3":
     builtin_string = "__builtin__"
@@ -49,7 +53,7 @@ facts = {
     },
     "RE0": {
         "status": "Testing",
-        "last_reboot_reason": "Router rebooted after a " "normal shutdown.",
+        "last_reboot_reason": "Router rebooted after a normal shutdown.",
         "model": "FIREFLY-PERIMETER RE",
         "up_time": "6 hours, 29 minutes, 30 seconds",
     },
@@ -59,7 +63,6 @@ facts = {
 }
 
 
-@attr("unit")
 class TestSW(unittest.TestCase):
     @patch("ncclient.manager.connect")
     def setUp(self, mock_connect):
@@ -106,7 +109,7 @@ class TestSW(unittest.TestCase):
         package = "test.tgz"
         self.assertEqual(
             SW.local_checksum(package, algorithm="sha256"),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934" "ca495991b7852b855",
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         )
 
     @patch(builtin_string + ".open")
@@ -244,10 +247,42 @@ class TestSW(unittest.TestCase):
         self.assertTrue(self.sw.install(package, issu=True, no_copy=True))
 
     @patch("jnpr.junos.Device.execute")
+    def test_sw_install_issu_validate_False(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        package = "test.tgz"
+        self.assertTrue(
+            self.sw.install(package, issu=True, no_copy=True, validate=False)
+        )
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_issu_validate_True(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        package = "test.tgz"
+        self.assertTrue(
+            self.sw.install(package, issu=True, no_copy=True, validate=True)
+        )
+
+    @patch("jnpr.junos.Device.execute")
     def test_sw_install_nssu(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
         package = "test.tgz"
         self.assertTrue(self.sw.install(package, nssu=True, no_copy=True))
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_nssu_validate_False(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        package = "test.tgz"
+        self.assertTrue(
+            self.sw.install(package, nssu=True, no_copy=True, validate=False)
+        )
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_nssu_validate_True(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        package = "test.tgz"
+        self.assertTrue(
+            self.sw.install(package, nssu=True, no_copy=True, validate=True)
+        )
 
     @patch("jnpr.junos.Device.execute")
     def test_sw_install_issu_nssu_both_error(self, mock_execute):
@@ -409,7 +444,7 @@ class TestSW(unittest.TestCase):
         self.sw.log = MagicMock()
         self.assertFalse(self.sw.validate("package.tgz", issu=True))
         self.sw.log.assert_called_with(
-            "Requirement FAILED: commit synchronize is not Enabled " "in configuration"
+            "Requirement FAILED: commit synchronize is not Enabled in configuration"
         )
 
     @patch("jnpr.junos.Device.execute")
@@ -462,6 +497,88 @@ class TestSW(unittest.TestCase):
         mock_execute.side_effect = etree.fromstring(rpc_reply)
         package = "package.tgz"
         self.assertFalse(self.sw.validate(package, issu=True))
+
+    # -------------------------------------------------------------------------
+    # validate with satellite tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_validate_with_satellite_name(self, mock_execute, mock_sat_check):
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = ["sat1"]
+        self.sw.validate("package.tgz", satellite_name="sat1")
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertIn("<device-list>sat1</device-list>", rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_validate_with_satellite_name_list(self, mock_execute, mock_sat_check):
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = ["sat1", "sat2"]
+        self.sw.validate("package.tgz", satellite_name=["sat1", "sat2"])
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertIn("<device-list>sat1</device-list>", rpc)
+        self.assertIn("<device-list>sat2</device-list>", rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    def test_sw_validate_satellite_none_alive(self, mock_sat_check):
+        mock_sat_check.return_value = []
+        self.assertFalse(self.sw.validate("package.tgz", satellite_name="sat_down"))
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    def test_sw_validate_satellite_rpc_error(self, mock_sat_check):
+        mock_sat_check.side_effect = RpcError(rsp=etree.XML("<rpc-error/>"))
+        self.assertRaises(
+            RpcError,
+            self.sw.validate,
+            "package.tgz",
+            satellite_name="sat1",
+        )
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_validate_no_package_result(self, mock_execute):
+        rpc_reply = """<rpc-reply>
+                        <output>Validation succeeded</output>
+                        </rpc-reply>"""
+        mock_execute.side_effect = etree.fromstring(rpc_reply)
+        self.assertTrue(self.sw.validate("package.tgz"))
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_validate_satellite_nested_error(self, mock_execute):
+        rpc_reply = """<rpc-reply>
+                        <satellite-device-information>
+                        <satellite-device>
+                        <satellite-mgmt-ip>satellite_two</satellite-mgmt-ip>
+                        <output>ERROR: Another package installation in progress</output>
+                        <package-result>1</package-result>
+                        </satellite-device>
+                        </satellite-device-information>
+                        </rpc-reply>"""
+        mock_execute.side_effect = etree.fromstring(rpc_reply)
+        self.assertFalse(self.sw.validate("package.tgz"))
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_validate_satellite_nested_success(self, mock_execute):
+        rpc_reply = """<rpc-reply>
+                        <satellite-device-information>
+                        <satellite-device>
+                        <satellite-mgmt-ip>satellite_two</satellite-mgmt-ip>
+                        <output>Validation succeeded</output>
+                        <package-result>0</package-result>
+                        </satellite-device>
+                        </satellite-device-information>
+                        </rpc-reply>"""
+        mock_execute.side_effect = etree.fromstring(rpc_reply)
+        self.assertTrue(self.sw.validate("package.tgz"))
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_validate_no_package_result_error(self, mock_execute):
+        rpc_reply = """<rpc-reply>
+                        <output>ERROR: package: /var/tmp/nonexistent.tgz is not found or empty</output>
+                        </rpc-reply>"""
+        mock_execute.side_effect = etree.fromstring(rpc_reply)
+        self.assertFalse(self.sw.validate("package.tgz"))
 
     @patch("jnpr.junos.Device.execute")
     def test_sw_remote_checksum_not_found(self, mock_execute):
@@ -676,25 +793,25 @@ class TestSW(unittest.TestCase):
     @patch("jnpr.junos.utils.sw.SW.pkgadd")
     def test_sw_install_multi_vc_member_id(self, mock_pkgadd):
         mock_pkgadd.return_value = True, "msg"
-        self.dev.facts["vc_master"] = '0'
+        self.dev.facts["vc_master"] = "0"
         self.sw._multi_RE = True
         self.sw._multi_VC = True
         self.sw._RE_list = ("version_RE0", "version_RE1")
-        self.assertTrue(self.sw.install("file", member_id=['1'], no_copy=True)[0])
+        self.assertTrue(self.sw.install("file", member_id=["1"], no_copy=True)[0])
 
     @patch("jnpr.junos.utils.sw.SW.pkgadd")
     def test_sw_install_multi_vc_multiple_member_id(self, mock_pkgadd):
         mock_pkgadd.return_value = True, "msg"
-        self.dev.facts["vc_master"] = '0'
+        self.dev.facts["vc_master"] = "0"
         self.sw._multi_RE = False
         self.sw._multi_VC_nsync = True
         self.sw._RE_list = ("version_RE0", "version_RE1")
-        self.assertTrue(self.sw.install("file", member_id=['0','1'], no_copy=True)[0])
+        self.assertTrue(self.sw.install("file", member_id=["0", "1"], no_copy=True)[0])
 
     @patch("jnpr.junos.utils.sw.SW.pkgadd")
     def test_sw_install_mixed_vc(self, mock_pkgadd):
         mock_pkgadd.return_value = True
-        self.dev.facts["vc_master"] = '0'
+        self.dev.facts["vc_master"] = "0"
         self.sw._mixed_VC = True
         self.sw._RE_list = ("version_RE0", "version_RE1")
         self.assertTrue(self.sw.install(pkg_set=["abc.tgz", "pqr.tgz"], no_copy=True))
@@ -832,13 +949,61 @@ class TestSW(unittest.TestCase):
         )
 
     @patch("jnpr.junos.Device.execute")
+    def test_sw_install_with_routing_instance(self, mock_execute):
+        self.sw.install("file", no_copy=True, routing_instance="mgmt_junos")
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertTrue("<routing-instance>mgmt_junos</routing-instance>" in rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_with_satellite_name(self, mock_execute, mock_sat_check):
+        mock_sat_check.return_value = ["sat1"]
+        self.sw.install("file", no_copy=True, satellite_name="sat1")
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertTrue("<device-list>sat1</device-list>" in rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_with_satellite_name_list(self, mock_execute, mock_sat_check):
+        mock_sat_check.return_value = ["sat1", "sat2"]
+        mock_execute.side_effect = self._mock_manager
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+            "sat2": {"2RE": False, "vc_capable": False},
+        }
+        self.sw.install("file", no_copy=True, satellite_name=["sat1", "sat2"])
+        # New behavior: each satellite gets its own pkgadd call
+        # Verify both satellites were addressed via execute calls
+        all_rpcs = "".join(
+            etree.tostring(c[0][0]).decode("utf-8")
+            for c in mock_execute.call_args_list
+            if c[0]
+        )
+        self.assertIn("<device-list>sat1</device-list>", all_rpcs)
+        self.assertIn("<device-list>sat2</device-list>", all_rpcs)
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_issu_with_routing_instance(self, mock_execute):
+        self.sw.install("file", no_copy=True, issu=True, routing_instance="mgmt_junos")
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertTrue("<routing-instance>mgmt_junos</routing-instance>" in rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_nssu_with_satellite_name(self, mock_execute, mock_sat_check):
+        mock_sat_check.return_value = ["sat1"]
+        self.sw.install("file", no_copy=True, nssu=True, satellite_name="sat1")
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertTrue("<device-list>sat1</device-list>" in rpc)
+
+    @patch("jnpr.junos.Device.execute")
     def test_sw_rollback(self, mock_execute):
         rsp = (
             "<rpc-reply><output>junos-vsrx-12.1X46-D30.2-domestic will "
             "become active at next reboot</output></rpc-reply>"
         )
         mock_execute.side_effect = etree.XML(rsp)
-        msg = "junos-vsrx-12.1X46-D30.2-domestic will become active " "at next reboot"
+        msg = "junos-vsrx-12.1X46-D30.2-domestic will become active at next reboot"
         self.assertEqual(self.sw.rollback(), msg)
 
     @patch("jnpr.junos.Device.execute")
@@ -979,6 +1144,36 @@ class TestSW(unittest.TestCase):
         self.assertRaises(Exception, self.sw.zeroize)
 
     @patch("jnpr.junos.Device.execute")
+    def test_sw_zeroize_vmhost(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        self.assertTrue("zeroizing vmhost" in self.sw.zeroize(vmhost=True))
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_zeroize_vmhost_uses_vmhost_rpc(self, mock_execute):
+        # Verify that the request-vmhost-zeroize RPC tag is used, not
+        # request-system-zeroize, for VMHost-based SRX platforms.
+        mock_execute.side_effect = self._mock_manager
+        self.sw.zeroize(vmhost=True)
+        rpc_call = mock_execute.call_args[0][0]
+        self.assertEqual(rpc_call.tag, "request-vmhost-zeroize")
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_zeroize_non_vmhost_uses_system_rpc(self, mock_execute):
+        # Verify that non-vmhost path still uses request-system-zeroize (or
+        # its sub-element, e.g. 'local' when 2RE is True and all_re=False).
+        mock_execute.side_effect = self._mock_manager
+        self.sw.zeroize()
+        rpc_call = mock_execute.call_args[0][0]
+        self.assertIn(rpc_call.tag, ("request-system-zeroize", "local", "media"))
+
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_zeroize_vmhost_exception(self, mock_execute):
+        # Exception path: non-warning RpcError on vmhost zeroize must propagate.
+        rsp = etree.XML("<rpc-reply><a>test</a></rpc-reply>")
+        mock_execute.side_effect = RpcError(rsp=rsp)
+        self.assertRaises(Exception, self.sw.zeroize, vmhost=True)
+
+    @patch("jnpr.junos.Device.execute")
     def test_sw_check_pending_install(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
         package = "test.tgz"
@@ -1035,7 +1230,20 @@ class TestSW(unittest.TestCase):
             if "path" in kwargs:
                 if kwargs["path"] == "/packages":
                     return self._read_file("file-list_dir.xml")
+            if "normalize" in kwargs and args:
+                if args[0].tag == "get-jnu-satellites-information":
+                    return self._read_file("get-jnu-satellites-information.xml")
             if args and self._testMethodName == "test_sw_zeroize":
+                return self._read_file("request-zeroize.xml")
+            if args and self._testMethodName in (
+                "test_sw_zeroize_vmhost",
+                "test_sw_zeroize_vmhost_uses_vmhost_rpc",
+            ):
+                return self._read_file("request-vmhost-zeroize.xml")
+            if (
+                args
+                and self._testMethodName == "test_sw_zeroize_non_vmhost_uses_system_rpc"
+            ):
                 return self._read_file("request-zeroize.xml")
             device_params = kwargs["device_params"]
             device_handler = make_device_handler(device_params)
@@ -1068,6 +1276,387 @@ class TestSW(unittest.TestCase):
                     return RpcError(rsp=etree.fromstring(xml))
             else:
                 return self._read_file(args[0].tag + ".xml")
+
+    # -------------------------------------------------------------------------
+    # _check_satellite_alive tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.Device.execute")
+    def test_check_satellite_alive_single_up(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        result = self.sw._check_satellite_alive("sat1")
+        self.assertEqual(result, ["sat1"])
+
+    @patch("jnpr.junos.Device.execute")
+    def test_check_satellite_alive_multiple_up(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        result = self.sw._check_satellite_alive(["sat1", "sat2"])
+        self.assertEqual(result, ["sat1", "sat2"])
+
+    @patch("jnpr.junos.Device.execute")
+    def test_check_satellite_alive_one_down(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        result = self.sw._check_satellite_alive(["sat1", "sat_down"])
+        self.assertEqual(result, ["sat1"])
+
+    @patch("jnpr.junos.Device.execute")
+    def test_check_satellite_alive_not_found(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        result = self.sw._check_satellite_alive("nonexistent")
+        self.assertEqual(result, [])
+
+    @patch("jnpr.junos.Device.execute")
+    def test_check_satellite_alive_all_down(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        result = self.sw._check_satellite_alive("sat_down")
+        self.assertEqual(result, [])
+
+    @patch("jnpr.junos.Device.execute")
+    def test_check_satellite_alive_rpc_error(self, mock_execute):
+        mock_execute.side_effect = RpcError(rsp=etree.XML("<rpc-error/>"))
+        self.assertRaises(RpcError, self.sw._check_satellite_alive, "sat1")
+
+    # -------------------------------------------------------------------------
+    # install with satellite alive check tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_satellite_none_alive(self, mock_execute, mock_sat_check):
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = []
+        result = self.sw.install("file", no_copy=True, satellite_name="sat_down")
+        self.assertFalse(result[0])
+        self.assertIn("No alive satellites", result[1])
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_satellite_rpc_error(self, mock_execute, mock_sat_check):
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.side_effect = RpcError(rsp=etree.XML("<rpc-error/>"))
+        result = self.sw.install("file", no_copy=True, satellite_name="sat1")
+        self.assertFalse(result[0])
+        self.assertIn("Problem checking satellite", result[1])
+
+    # -------------------------------------------------------------------------
+    # reboot with satellite tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_reboot_with_satellite_name(self, mock_execute, mock_sat_check):
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = ["sat1"]
+        self.sw.reboot(satellite_name="sat1")
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertIn("<device-list>sat1</device-list>", rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_reboot_with_satellite_name_list(self, mock_execute, mock_sat_check):
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = ["sat1", "sat2"]
+        self.sw.reboot(satellite_name=["sat1", "sat2"])
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertIn("<device-list>sat1</device-list>", rpc)
+        self.assertIn("<device-list>sat2</device-list>", rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    def test_sw_reboot_satellite_none_alive(self, mock_sat_check):
+        mock_sat_check.return_value = []
+        self.assertRaises(RpcError, self.sw.reboot, satellite_name="sat_down")
+
+    # -------------------------------------------------------------------------
+    # rollback with satellite tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_rollback_with_satellite_name(self, mock_execute, mock_sat_check):
+        mock_sat_check.return_value = ["sat1"]
+        mock_execute.side_effect = self._mock_manager
+        rsp = (
+            "<rpc-reply><output>junos-vsrx-12.1X46-D30.2-domestic will "
+            "become active at next reboot</output></rpc-reply>"
+        )
+        mock_execute.side_effect = etree.XML(rsp)
+        msg = "junos-vsrx-12.1X46-D30.2-domestic will become active at next reboot"
+        self.assertEqual(self.sw.rollback(satellite_name="sat1"), msg)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_rollback_with_satellite_name_list(self, mock_execute, mock_sat_check):
+        mock_sat_check.return_value = ["sat1", "sat2"]
+        rsp = (
+            "<rpc-reply><output>junos-vsrx-12.1X46-D30.2-domestic will "
+            "become active at next reboot</output></rpc-reply>"
+        )
+        mock_execute.side_effect = etree.XML(rsp)
+        self.sw.rollback(satellite_name=["sat1", "sat2"])
+        rpc = etree.tostring(mock_execute.call_args[0][0]).decode("utf-8")
+        self.assertIn("<device-list>sat1</device-list>", rpc)
+        self.assertIn("<device-list>sat2</device-list>", rpc)
+
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    def test_sw_rollback_satellite_none_alive(self, mock_sat_check):
+        mock_sat_check.return_value = []
+        self.assertRaises(SwRollbackError, self.sw.rollback, satellite_name="sat_down")
+
+    # -------------------------------------------------------------------------
+    # _install_on_satellites tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_single_re(self, mock_pkgadd):
+        """Single-RE satellite: one pkgadd call with device_list."""
+        mock_pkgadd.return_value = (True, "installed ok")
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=False
+        )
+        self.assertTrue(ok)
+        self.assertIn("Satellite sat1:", msg)
+        mock_pkgadd.assert_called_once()
+        call_kwargs = mock_pkgadd.call_args[1]
+        self.assertEqual(call_kwargs["device_list"], ["sat1"])
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_dual_re(self, mock_pkgadd):
+        """Dual-RE satellite: two pkgadd calls (re0, re1)."""
+        mock_pkgadd.side_effect = [
+            (True, "re0 installed"),
+            (True, "re1 installed"),
+        ]
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": True, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=False
+        )
+        self.assertTrue(ok)
+        self.assertIn("Satellite sat1 RE0:", msg)
+        self.assertIn("Satellite sat1 RE1:", msg)
+        self.assertEqual(mock_pkgadd.call_count, 2)
+        # First call has re0=True
+        first_kwargs = mock_pkgadd.call_args_list[0][1]
+        self.assertTrue(first_kwargs.get("re0"))
+        # Second call has re1=True
+        second_kwargs = mock_pkgadd.call_args_list[1][1]
+        self.assertTrue(second_kwargs.get("re1"))
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_dual_re_failure(self, mock_pkgadd):
+        """Dual-RE satellite: re1 install fails, overall_ok is False."""
+        mock_pkgadd.side_effect = [
+            (True, "re0 ok"),
+            (False, "re1 failed"),
+        ]
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": True, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=False
+        )
+        self.assertFalse(ok)
+        self.assertIn("re1 failed", msg)
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_vc_mode(self, mock_pkgadd):
+        """VC-capable satellite: pkgadd called with member kwarg."""
+        mock_pkgadd.return_value = (True, "vc installed")
+        self.dev.facts["satellites_info"] = {
+            "sat1": {
+                "2RE": False,
+                "vc_capable": True,
+                "vc_mode": "Enabled",
+                "vc_master": "0",
+            },
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=False
+        )
+        self.assertTrue(ok)
+        self.assertIn("Satellite sat1 (VC):", msg)
+        call_kwargs = mock_pkgadd.call_args[1]
+        self.assertEqual(call_kwargs["member"], "0")
+        self.assertEqual(call_kwargs["device_list"], ["sat1"])
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_vc_disabled_uses_single(self, mock_pkgadd):
+        """VC-capable but Disabled mode: falls through to single-RE path."""
+        mock_pkgadd.return_value = (True, "ok")
+        self.dev.facts["satellites_info"] = {
+            "sat1": {
+                "2RE": False,
+                "vc_capable": True,
+                "vc_mode": "Disabled",
+            },
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=False
+        )
+        self.assertTrue(ok)
+        self.assertIn("Satellite sat1:", msg)
+        self.assertNotIn("(VC)", msg)
+
+    @patch("jnpr.junos.utils.sw.SW.validate")
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_validate_true(self, mock_pkgadd, mock_validate):
+        """validate=True: validate() called before pkgadd for each satellite."""
+        mock_validate.return_value = True
+        mock_pkgadd.return_value = (True, "ok")
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=True
+        )
+        self.assertTrue(ok)
+        mock_validate.assert_called_once_with(
+            "/var/tmp/pkg.tgz", satellite_name="sat1", dev_timeout=1800
+        )
+        mock_pkgadd.assert_called_once()
+
+    @patch("jnpr.junos.utils.sw.SW.validate")
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_validate_fails(self, mock_pkgadd, mock_validate):
+        """validate=True but validation fails: pkgadd not called, result is False."""
+        mock_validate.return_value = False
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=True
+        )
+        self.assertFalse(ok)
+        self.assertIn("validation failed", msg)
+        mock_pkgadd.assert_not_called()
+
+    @patch("jnpr.junos.utils.sw.SW.validate")
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_validate_rpc_error(self, mock_pkgadd, mock_validate):
+        """validate raises RpcError (not syntax error): skip satellite."""
+        mock_validate.side_effect = RpcError(rsp=etree.XML("<rpc-error/>"))
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=True
+        )
+        self.assertFalse(ok)
+        self.assertIn("validation raised error", msg)
+        mock_pkgadd.assert_not_called()
+
+    @patch("jnpr.junos.utils.sw.SW.validate")
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_validate_syntax_error_continues(
+        self, mock_pkgadd, mock_validate
+    ):
+        """validate raises RpcError with 'syntax error': treat as ok, proceed."""
+        err = RpcError(rsp=etree.XML("<rpc-error/>"))
+        err.message = "syntax error"
+        mock_validate.side_effect = err
+        mock_pkgadd.return_value = (True, "ok")
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=False, timeout=1800, validate=True
+        )
+        self.assertTrue(ok)
+        mock_pkgadd.assert_called_once()
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_multiple_satellites(self, mock_pkgadd):
+        """Multiple satellites: each gets its own pkgadd call."""
+        mock_pkgadd.side_effect = [
+            (True, "sat1 ok"),
+            (True, "sat2 ok"),
+        ]
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+            "sat2": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz",
+            ["sat1", "sat2"],
+            vmhost=False,
+            timeout=1800,
+            validate=False,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(mock_pkgadd.call_count, 2)
+        # Verify each call used different device_list
+        self.assertEqual(mock_pkgadd.call_args_list[0][1]["device_list"], ["sat1"])
+        self.assertEqual(mock_pkgadd.call_args_list[1][1]["device_list"], ["sat2"])
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_no_facts_uses_single_path(self, mock_pkgadd):
+        """Satellite not in satellites_info: defaults to single-RE path."""
+        mock_pkgadd.return_value = (True, "ok")
+        self.dev.facts["satellites_info"] = {}
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz",
+            ["unknown_sat"],
+            vmhost=False,
+            timeout=1800,
+            validate=False,
+        )
+        self.assertTrue(ok)
+        self.assertIn("Satellite unknown_sat:", msg)
+
+    @patch("jnpr.junos.utils.sw.SW.pkgadd")
+    def test_install_on_satellites_vmhost_passed(self, mock_pkgadd):
+        """vmhost=True is passed through to pkgadd."""
+        mock_pkgadd.return_value = (True, "ok")
+        self.dev.facts["satellites_info"] = {
+            "sat1": {"2RE": False, "vc_capable": False},
+        }
+        ok, msg = self.sw._install_on_satellites(
+            "/var/tmp/pkg.tgz", ["sat1"], vmhost=True, timeout=1800, validate=False
+        )
+        self.assertTrue(ok)
+        call_kwargs = mock_pkgadd.call_args[1]
+        self.assertTrue(call_kwargs["vmhost"])
+
+    # -------------------------------------------------------------------------
+    # install() with satellite_name end-to-end tests
+    # -------------------------------------------------------------------------
+
+    @patch("jnpr.junos.utils.sw.SW._install_on_satellites")
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_satellite_calls_install_on_satellites(
+        self, mock_execute, mock_sat_check, mock_install_sat
+    ):
+        """install(satellite_name=...) delegates to _install_on_satellites."""
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = ["sat1"]
+        mock_install_sat.return_value = (True, "done")
+        ok, msg = self.sw.install("test.tgz", no_copy=True, satellite_name="sat1")
+        self.assertTrue(ok)
+        mock_install_sat.assert_called_once()
+        call_args = mock_install_sat.call_args
+        self.assertEqual(call_args[0][1], ["sat1"])  # alive_satellites
+
+    @patch("jnpr.junos.utils.sw.SW._install_on_satellites")
+    @patch("jnpr.junos.utils.sw.SW._check_satellite_alive")
+    @patch("jnpr.junos.Device.execute")
+    def test_sw_install_satellite_multiple_alive(
+        self, mock_execute, mock_sat_check, mock_install_sat
+    ):
+        """install(satellite_name=[...]) passes all alive satellites."""
+        mock_execute.side_effect = self._mock_manager
+        mock_sat_check.return_value = ["sat1", "sat2"]
+        mock_install_sat.return_value = (True, "all ok")
+        ok, msg = self.sw.install(
+            "test.tgz", no_copy=True, satellite_name=["sat1", "sat2"]
+        )
+        self.assertTrue(ok)
+        call_args = mock_install_sat.call_args
+        self.assertEqual(call_args[0][1], ["sat1", "sat2"])
 
 
 if __name__ == "__main__":

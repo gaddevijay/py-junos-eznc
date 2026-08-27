@@ -1,4 +1,5 @@
 import re
+
 from jnpr.junos import jxml
 from jnpr.junos import jxml as JXML
 from lxml.etree import _Element
@@ -14,7 +15,6 @@ class FactLoopError(RuntimeError):
 
 
 class RpcError(Exception):
-
     """
     Parent class for all junos-pyez RPC Exceptions
     """
@@ -87,7 +87,6 @@ class RpcError(Exception):
 
 
 class CommitError(RpcError):
-
     """
     Generated in response to a commit-check or a commit action.
     """
@@ -98,8 +97,8 @@ class CommitError(RpcError):
     def __repr__(self):
         return "{}(edit_path: {}, bad_element: {}, message: {})".format(
             self.__class__.__name__,
-            self.rpc_error["edit_path"],
-            self.rpc_error["bad_element"],
+            self.rpc_error.get("edit_path") if self.rpc_error else None,
+            self.rpc_error.get("bad_element") if self.rpc_error else None,
             self.message,
         )
 
@@ -107,7 +106,6 @@ class CommitError(RpcError):
 
 
 class ConfigLoadError(RpcError):
-
     """
     Generated in response to a failure when loading a configuration.
     """
@@ -118,8 +116,8 @@ class ConfigLoadError(RpcError):
     def __repr__(self):
         return "{}(severity: {}, bad_element: {}, message: {})".format(
             self.__class__.__name__,
-            self.rpc_error["severity"],
-            self.rpc_error["bad_element"],
+            self.rpc_error.get("severity") if self.rpc_error else None,
+            self.rpc_error.get("bad_element") if self.rpc_error else None,
             self.message,
         )
 
@@ -127,7 +125,6 @@ class ConfigLoadError(RpcError):
 
 
 class LockError(RpcError):
-
     """
     Generated in response to attempting to take an exclusive
     lock on the configuration database.
@@ -138,7 +135,6 @@ class LockError(RpcError):
 
 
 class UnlockError(RpcError):
-
     """
     Generated in response to attempting to unlock the
     configuration database.
@@ -149,7 +145,6 @@ class UnlockError(RpcError):
 
 
 class PermissionError(RpcError):
-
     """
     Generated in response to invoking an RPC for which the
     auth user does not have user-class permissions.
@@ -164,7 +159,6 @@ class PermissionError(RpcError):
 
 
 class RpcTimeoutError(RpcError):
-
     """
     Generated in response to a RPC execution timeout.
     """
@@ -181,7 +175,6 @@ class RpcTimeoutError(RpcError):
 
 
 class SwRollbackError(RpcError):
-
     """
     Generated in response to a SW rollback error.
     """
@@ -208,7 +201,6 @@ class SwRollbackError(RpcError):
 
 
 class ConnectError(Exception):
-
     """
     Parent class for all connection related exceptions
     """
@@ -249,7 +241,6 @@ class ConnectError(Exception):
 
 
 class ProbeError(ConnectError):
-
     """
     Generated if auto_probe is enabled and the probe action fails
     """
@@ -258,7 +249,6 @@ class ProbeError(ConnectError):
 
 
 class ConnectAuthError(ConnectError):
-
     """
     Generated if the user-name, password is invalid
     """
@@ -267,7 +257,6 @@ class ConnectAuthError(ConnectError):
 
 
 class ConnectTimeoutError(ConnectError):
-
     """
     Generated if the NETCONF session fails to connect, could
     be due to the fact the device is not ip reachable; bad
@@ -278,7 +267,6 @@ class ConnectTimeoutError(ConnectError):
 
 
 class ConnectUnknownHostError(ConnectError):
-
     """
     Generated if the specific hostname does not DNS resolve
     """
@@ -287,7 +275,6 @@ class ConnectUnknownHostError(ConnectError):
 
 
 class ConnectRefusedError(ConnectError):
-
     """
     Generated if the specified host denies the NETCONF; could
     be that the services is not enabled, or the host has
@@ -298,7 +285,6 @@ class ConnectRefusedError(ConnectError):
 
 
 class ConnectNotMasterError(ConnectError):
-
     """
     Generated if the connection is made to a non-master
     routing-engine.  This could be a backup RE on an MX
@@ -309,7 +295,6 @@ class ConnectNotMasterError(ConnectError):
 
 
 class ConnectClosedError(ConnectError):
-
     """
     Generated if connection unexpectedly closed
     """
@@ -320,7 +305,6 @@ class ConnectClosedError(ConnectError):
 
 
 class JSONLoadError(Exception):
-
     """
     Generated if json content of rpc reply fails to load
     """
@@ -338,11 +322,8 @@ class JSONLoadError(Exception):
 
     def __repr__(self):
         if self.offending_line:
-            return (
-                "{}(reason: {}, \nThe offending config appears "
-                "to be: \n{})".format(
-                    self.__class__.__name__, self.ex_msg, self.offending_line
-                )
+            return "{}(reason: {}, \nThe offending config appears to be: \n{})".format(
+                self.__class__.__name__, self.ex_msg, self.offending_line
             )
         else:
             return "{}(reason: {})".format(self.__class__.__name__, self.ex_msg)

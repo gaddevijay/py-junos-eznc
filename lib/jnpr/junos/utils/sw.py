@@ -1,9 +1,10 @@
 # stdlib
 from __future__ import print_function
+
 import hashlib
 import re
-from os import path
 import sys
+from os import path
 
 try:
     # Python 3.x
@@ -13,18 +14,18 @@ except ImportError:
     from urlparse import urlparse
 
 # 3rd-party modules
-from lxml.builder import E
-from lxml import etree
+from jnpr.junos import jxml as JXML
 
 # local modules
 from jnpr.junos.decorators import timeoutDecorator
-from jnpr.junos.utils.util import Util
-from jnpr.junos.utils.scp import SCP
+from jnpr.junos.exception import RpcError, RpcTimeoutError, SwRollbackError
 from jnpr.junos.utils.ftp import FTP
+from jnpr.junos.utils.scp import SCP
 from jnpr.junos.utils.start_shell import StartShell
-from jnpr.junos.exception import SwRollbackError, RpcTimeoutError, RpcError
+from jnpr.junos.utils.util import Util
+from lxml import etree
+from lxml.builder import E
 from ncclient.xml_ import NCElement
-from jnpr.junos import jxml as JXML
 
 """
 Software Installation Utilities
@@ -102,6 +103,191 @@ class SW(Util):
             "current_re" in dev.facts and "localre" in dev.facts["current_re"]
         )
         self.log = lambda report: None
+
+    # -----------------------------------------------------------------------
+    # SATELLITE HELPER
+    # -----------------------------------------------------------------------
+
+    def _check_satellite_alive(self, satellite_name):
+        """Check which satellites from the given list are alive.
+
+        :param satellite_name:
+          A satellite name (str) or a list/tuple of satellite names.
+
+        :returns:
+          A list of satellite names whose ``alive`` status is ``up``.
+
+        :raises RpcError:
+          If the ``get-jnu-satellites-information`` RPC fails or returns
+          an unexpected response.
+        """
+        if isinstance(satellite_name, str):
+            satellite_name_list = [satellite_name]
+        else:
+            satellite_name_list = list(satellite_name)
+
+        sat_info = self.rpc.get_jnu_satellites_information(normalize=True)
+        if not hasattr(sat_info, "xpath"):
+            raise RpcError(
+                "get-jnu-satellites-information returned unexpected response"
+            )
+
+        alive_satellites = []
+        for sat_name in satellite_name_list:
+            query = f"//satellite-information[satellite-ip='{sat_name}']"
+            target_sat = sat_info.xpath(query)
+            if target_sat:
+                status = target_sat[0].findtext("alive", default="").strip()
+                if status == "up":
+                    self.log(f"Satellite {sat_name} is operational (state: {status}).")
+                    alive_satellites.append(sat_name)
+                else:
+                    self.log(
+                        f"WARNING: Satellite {sat_name} is NOT up! "
+                        f"Current state: {status}"
+                    )
+            else:
+                self.log(f"WARNING: No satellite found with name {sat_name}")
+
+        return alive_satellites
+
+    def _install_on_satellites(
+        self, remote_package, alive_satellites, vmhost, timeout, validate, **kwargs
+    ):
+        """Install software on satellite devices using their facts to determine
+        the correct RE/VC/vmhost strategy per satellite.
+
+        For each alive satellite, inspects the satellite's facts from
+        ``dev.facts['satellites_info']`` to decide:
+          - If satellite is a VC member: install per VC member
+          - If satellite is dual-RE: install on re0 and re1
+          - Otherwise: simple single-RE install
+
+        :param str remote_package:
+          Remote path to the package on the device.
+        :param list alive_satellites:
+          List of satellite names that are alive.
+        :param bool vmhost:
+          Whether vmhost install is requested.
+        :param int timeout:
+          RPC timeout for the install operation.
+        :param bool validate:
+          Whether to validate before install.
+        :param dict kwargs:
+          Additional kwargs passed through to pkgadd.
+
+        :returns: tuple(bool, str) — overall success status and messages.
+        """
+        overall_ok = True
+        overall_msg = ""
+        satellites_info = self._dev.facts.get("satellites_info", {})
+
+        for sat_name in alive_satellites:
+            sat_facts = satellites_info.get(sat_name, {})
+            sat_kwargs = dict(kwargs)
+            sat_kwargs["device_list"] = [sat_name]
+
+            # Determine satellite vmhost status from its facts
+            sat_vmhost = vmhost
+
+            # --- Validate on satellite if requested ---
+            if validate is True:
+                self.log(
+                    "validating software on satellite %s ... "
+                    "please be patient ..." % sat_name
+                )
+                try:
+                    v_ok = self.validate(
+                        remote_package,
+                        satellite_name=sat_name,
+                        dev_timeout=timeout,
+                    )
+                except RpcError as e:
+                    if "syntax error" in (getattr(e, "message", "") or ""):
+                        v_ok = True
+                    else:
+                        overall_ok = False
+                        overall_msg += "\nSatellite %s: validation raised error: %s" % (
+                            sat_name,
+                            str(e),
+                        )
+                        continue
+                if v_ok is not True:
+                    overall_ok = False
+                    overall_msg += (
+                        "\nSatellite %s: package validation failed" % sat_name
+                    )
+                    continue
+
+            # --- Determine install strategy based on satellite RE/VC facts ---
+            sat_vc_capable = sat_facts.get("vc_capable", False)
+            sat_vc_mode = sat_facts.get("vc_mode")
+            sat_dual_re = sat_facts.get("2RE", False)
+            sat_vc_master = sat_facts.get("vc_master")
+
+            if sat_vc_capable and sat_vc_mode not in (None, "Disabled"):
+                # Satellite is a VC member — install per member
+                self.log(
+                    "installing software on satellite %s (VC mode) ... "
+                    "please be patient ..." % sat_name
+                )
+                if sat_vc_master is not None:
+                    sat_kwargs["member"] = sat_vc_master
+                bool_ret, msg = self.pkgadd(
+                    remote_package,
+                    vmhost=sat_vmhost,
+                    dev_timeout=timeout,
+                    **sat_kwargs,
+                )
+                overall_ok = overall_ok and bool_ret
+                overall_msg += "\nSatellite %s (VC): %s" % (sat_name, msg)
+            elif sat_dual_re:
+                # Satellite has dual RE — install on both re0 and re1
+                self.log(
+                    "installing software on satellite %s RE0 ... "
+                    "please be patient ..." % sat_name
+                )
+                sat_kwargs_re0 = dict(sat_kwargs)
+                sat_kwargs_re0["re0"] = True
+                bool_ret, msg = self.pkgadd(
+                    remote_package,
+                    vmhost=sat_vmhost,
+                    dev_timeout=timeout,
+                    **sat_kwargs_re0,
+                )
+                overall_ok = overall_ok and bool_ret
+                overall_msg += "\nSatellite %s RE0: %s" % (sat_name, msg)
+
+                self.log(
+                    "installing software on satellite %s RE1 ... "
+                    "please be patient ..." % sat_name
+                )
+                sat_kwargs_re1 = dict(sat_kwargs)
+                sat_kwargs_re1["re1"] = True
+                bool_ret, msg = self.pkgadd(
+                    remote_package,
+                    vmhost=sat_vmhost,
+                    dev_timeout=timeout,
+                    **sat_kwargs_re1,
+                )
+                overall_ok = overall_ok and bool_ret
+                overall_msg += "\nSatellite %s RE1: %s" % (sat_name, msg)
+            else:
+                # Single RE satellite — simple install
+                self.log(
+                    "installing software on satellite %s ... "
+                    "please be patient ..." % sat_name
+                )
+                bool_ret, msg = self.pkgadd(
+                    remote_package,
+                    vmhost=sat_vmhost,
+                    dev_timeout=timeout,
+                    **sat_kwargs,
+                )
+                overall_ok = overall_ok and bool_ret
+                overall_msg += "\nSatellite %s: %s" % (sat_name, msg)
+
+        return overall_ok, overall_msg.strip()
 
     # -----------------------------------------------------------------------
     # CLASS METHODS
@@ -303,9 +489,9 @@ class SW(Util):
     def _parse_pkgadd_response(self, rsp):
         got = rsp.getparent()
         output_msg = "\n".join(
-            [i.text for i in got.findall("output") if i.text is not None]
+            [i.text for i in got.findall(".//output") if i.text is not None]
         )
-        package_result = got.findtext("package-result")
+        package_result = got.findtext(".//package-result")
         if package_result is None:
             # <package-result> is not present
             if "ERROR:" in output_msg and (
@@ -332,15 +518,30 @@ class SW(Util):
     # validate - perform 'request' operation to validate the package
     # -------------------------------------------------------------------------
 
-    def validate(self, remote_package, issu=False, nssu=False, **kwargs):
+    def validate(
+        self, remote_package, issu=False, nssu=False, satellite_name=None, **kwargs
+    ):
         """
         Issues the 'request' operation to validate the package against the
         config.
+
+        :param satellite_name:
+            (Optional) A satellite name (str) or list of satellite names to
+            validate on.  Only satellites whose ``alive`` status is ``up``
+            will be included.
 
         :returns:
             * ``True`` if validation passes. i.e return code (rc) value is 0
             * * ``False`` otherwise
         """
+        if satellite_name is not None:
+            alive_satellites = self._check_satellite_alive(satellite_name)
+            if not alive_satellites:
+                self.log("ERROR: No alive satellites available for validation")
+                return False
+            if "device_list" not in kwargs:
+                kwargs["device_list"] = alive_satellites
+
         if nssu and not self._issu_nssu_requirement_validation():
             return False
         if issu:
@@ -353,10 +554,22 @@ class SW(Util):
             rsp = self.rpc.request_package_validate(
                 package_name=remote_package, **kwargs
             ).getparent()
-        rc = int(rsp.findtext("package-result"))
         output_msg = "\n".join(
-            [i.text for i in rsp.findall("output") if i.text is not None]
+            [i.text for i in rsp.findall(".//output") if i.text is not None]
         )
+        package_result = rsp.findtext(".//package-result")
+        if package_result is None:
+            if "ERROR:" in output_msg and (
+                ("is not found" in output_msg) or ("no such file" in output_msg)
+            ):
+                package_result = "1"
+            else:
+                self.log(
+                    "software validate response is missing package-result "
+                    "element. Assuming success."
+                )
+                package_result = "0"
+        rc = int(package_result.strip())
         self.log("software validate package-result: %s\nOutput: %s" % (rc, output_msg))
         return 0 == rc
 
@@ -413,7 +626,7 @@ class SW(Util):
             # request-shell-execute rpc is not available for <14.1
             with StartShell(self._dev) as ss:
                 ss.run("cli", "> ", timeout=5)
-                if ss.run("request routing-engine " "login other-routing-engine")[0]:
+                if ss.run("request routing-engine login other-routing-engine")[0]:
                     # depending on user permission, prompt will go to either
                     # cli or shell, below line of code prompt will finally end
                     # up in cli mode
@@ -423,12 +636,12 @@ class SW(Util):
                     ss.run("exit")
                 else:
                     self.log(
-                        "Requirement FAILED: Not able run " '"show system switchover"'
+                        'Requirement FAILED: Not able run "show system switchover"'
                     )
                     return False
         gres_status = re.search(r"Graceful switchover: (\w+)", output, re.I)
         if not (gres_status is not None and gres_status.group(1).lower() == "on"):
-            self.log("Requirement FAILED: Graceful switchover status " "is not On")
+            self.log("Requirement FAILED: Graceful switchover status is not On")
             return False
         self.log("Graceful switchover status is On")
         return True
@@ -465,7 +678,7 @@ class SW(Util):
             },
         )
         if conf.find("chassis/redundancy/graceful-switchover") is None:
-            self.log("Requirement FAILED: GRES is not Enabled " "in configuration")
+            self.log("Requirement FAILED: GRES is not Enabled in configuration")
             return False
         self.log("Checking commit synchronize configuration")
         conf = self._dev.rpc.get_config(
@@ -487,8 +700,7 @@ class SW(Util):
         )
         if conf.find("system/commit/synchronize") is None:
             self.log(
-                "Requirement FAILED: commit synchronize is not "
-                "Enabled in configuration"
+                "Requirement FAILED: commit synchronize is not Enabled in configuration"
             )
             return False
         self.log("Checking NSR configuration")
@@ -705,11 +917,13 @@ class SW(Util):
         cleanfs_timeout=300,
         checksum_timeout=300,
         checksum_algorithm="md5",
+        routing_instance=None,
+        satellite_name=None,
         force_copy=False,
         all_re=True,
         member_id=None,
         vmhost=False,
-        **kwargs
+        **kwargs,
     ):
         """
         Performs the complete installation of the **package** that includes the
@@ -757,7 +971,7 @@ class SW(Util):
                       * MX virtual-chassis
 
         You can get a progress report on this process by providing a
-        **progress** callback.
+        ``progress`` callback.
 
         .. note:: You will need to invoke the :meth:`reboot` method explicitly
                    to reboot the device.
@@ -865,9 +1079,10 @@ class SW(Util):
           (Optional) A boolean indicating if this is a software update of the
           vhmhost. The default is ``vmhost=False``.
 
-        :param kwargs **kwargs:
-          (Optional) Additional keyword arguments are passed through to the
-          "package add" RPC.
+        :param dict kwargs:
+          (Optional) Additional keyword arguments passed through to the
+          ``package add`` RPC. Use dash-to-underscore conversion for RPC
+          parameters when passing them in via Python kwargs.
 
         :returns: tuple(<status>, <msg>)
             * status : ``True`` when the installation is successful and ``False`` otherwise
@@ -887,6 +1102,24 @@ class SW(Util):
                 progress(self._dev, report)
 
         self.log = _progress
+
+        if routing_instance is not None and "routing_instance" not in kwargs:
+            kwargs["routing_instance"] = routing_instance
+
+        # ---------------------------------------------------------------------
+        # Check satellite devices are active before doing software installation on them.
+        # ---------------------------------------------------------------------
+        if satellite_name is not None:
+            try:
+                alive_satellites = self._check_satellite_alive(satellite_name)
+                if not alive_satellites:
+                    error_msg = "ERROR: No alive satellites available for installation"
+                    _progress(error_msg)
+                    return False, error_msg
+            except RpcError as err:
+                error_msg = "Problem checking satellite device status: %s" % (str(err))
+                _progress(error_msg)
+                return False, error_msg
 
         # ---------------------------------------------------------------------
         # Before doing anything, Do check if any pending install exists.
@@ -958,6 +1191,20 @@ class SW(Util):
 
         if len(remote_pkg_set) == 1:
             remote_package = remote_pkg_set[0]
+
+            # -----------------------------------------------------------------
+            # Satellite install path: use satellite facts for RE/VC handling
+            # -----------------------------------------------------------------
+            if satellite_name is not None:
+                return self._install_on_satellites(
+                    remote_package,
+                    alive_satellites,
+                    vmhost=vmhost,
+                    timeout=timeout,
+                    validate=validate,
+                    **kwargs,
+                )
+
             # validate can't be used in the case of a Mixed VC
             # With vmhost=True, validate is handled in the package add.
             if validate is True:
@@ -984,11 +1231,17 @@ class SW(Util):
                     kwargs.update({"no_validate": True})
 
             if issu is True:
+                if validate is False:  # To Check validation is False
+                    # Need to pass the no_validate option via kwargs
+                    kwargs.update({"no_validate": True})
                 _progress("ISSU: installing software ... please be patient ...")
                 return self.pkgaddISSU(
                     remote_package, vmhost=vmhost, dev_timeout=timeout, **kwargs
                 )
             elif nssu is True:
+                if validate is False:
+                    # Need to pass the no_validate option via kwargs
+                    kwargs.update({"no_validate": True})
                 _progress("NSSU: installing software ... please be patient ...")
                 return self.pkgaddNSSU(remote_package, dev_timeout=timeout, **kwargs)
             elif member_id is not None:
@@ -1012,7 +1265,7 @@ class SW(Util):
                                 vmhost=vmhost,
                                 member=vc_id,
                                 dev_timeout=timeout,
-                                **kwargs
+                                **kwargs,
                             )
                             ok = ok[0] and bool_ret, ok[1] + "\n" + msg
                     return ok
@@ -1033,7 +1286,8 @@ class SW(Util):
                         for x in self._RE_list
                         if re.search(r"(\d+)", x)
                     ]
-                    vc_members.remove(self.dev.facts["vc_master"])
+                    if self.dev.facts["vc_master"] in vc_members:
+                        vc_members.remove(self.dev.facts["vc_master"])
                     vc_members.insert(len(vc_members), self.dev.facts["vc_master"])
                     for vc_id in vc_members:
                         _progress(
@@ -1045,29 +1299,40 @@ class SW(Util):
                             vmhost=vmhost,
                             member=vc_id,
                             dev_timeout=timeout,
-                            **kwargs
+                            **kwargs,
                         )
                         ok = ok[0] and bool_ret, ok[1] + "\n" + msg
                     return ok
                 else:
-                    # then this is a device with two RE that supports the "re0"
-                    # and "re1" options to the command (M, MX tested only)
-                    _progress("installing software on RE0 ... please be patient ...")
-                    ok = self.pkgadd(
-                        remote_package,
-                        vmhost=vmhost,
-                        re0=True,
-                        dev_timeout=timeout,
-                        **kwargs
-                    )
-                    _progress("installing software on RE1 ... please be patient ...")
-                    bool_ret, msg = self.pkgadd(
-                        remote_package,
-                        vmhost=vmhost,
-                        re1=True,
-                        dev_timeout=timeout,
-                        **kwargs
-                    )
+                    # For Dual RE device re0/re1 is not required
+                    if self._dev.facts["_is_linux"]:
+                        _progress("installing software ... please be patient ...")
+                        ok = self.pkgadd(
+                            remote_package, vmhost=vmhost, dev_timeout=timeout, **kwargs
+                        )
+                    else:
+                        # then this is a device with two RE that supports the "re0"
+                        # and "re1" options to the command (M, MX tested only)
+                        _progress(
+                            "installing software on RE0 ... please be patient ..."
+                        )
+                        ok = self.pkgadd(
+                            remote_package,
+                            vmhost=vmhost,
+                            re0=True,
+                            dev_timeout=timeout,
+                            **kwargs,
+                        )
+                        _progress(
+                            "installing software on RE1 ... please be patient ..."
+                        )
+                        bool_ret, msg = self.pkgadd(
+                            remote_package,
+                            vmhost=vmhost,
+                            re1=True,
+                            dev_timeout=timeout,
+                            **kwargs,
+                        )
                     ok = ok[0] and bool_ret, ok[1] + "\n" + msg
                     return ok
 
@@ -1131,13 +1396,12 @@ class SW(Util):
             elif self._mixed_VC is True:
                 cmd.append(E("all-members"))
         elif (
-            self._multi_VC_nsync is True
-            or self._multi_VC is True
-            and member_id is not None
-        ):
+            self._multi_VC_nsync is True or self._multi_VC is True
+        ) and member_id is not None:
             cmd.append(E("member", str(member_id)))
         if in_min >= 0 and at is None:
-            cmd.append(E("in", str(in_min)))
+            if vmhost is not True:
+                cmd.append(E("in", str(in_min)))
         elif at is not None:
             cmd.append(E("at", str(at)))
         try:
@@ -1175,6 +1439,7 @@ class SW(Util):
         vmhost=False,
         other_re=False,
         member_id=None,
+        satellite_name=None,
     ):
         """
         Perform a system reboot, with optional delay (in minutes) or at
@@ -1206,12 +1471,29 @@ class SW(Util):
             (optional) install software on the specified members ids of VC.
             The default is ``member_id=None``.
 
+        :param satellite_name:
+            (Optional) A satellite name (str) or list of satellite names to
+            reboot.  Only satellites whose ``alive`` status is ``up`` will
+            be included.
+
         :returns:
             * reboot message (string) if command successful
         """
+
+        if (
+            self._multi_VC_nsync is True or self._multi_VC is True
+        ) and member_id is not None:
+            vc_members = [
+                re.search(r"(\d+)", x).group(1)
+                for x in self._RE_list
+                if re.search(r"(\d+)", x)
+            ]
+            vc_members.remove(self.dev.facts["vc_master"])
+            vc_members.insert(len(vc_members), self.dev.facts["vc_master"])
+
         if self._dev.facts["_is_linux"]:
             if on_node is None:
-                cmd = E("request-shutdown-reboot")
+                cmd = E("request-system-reboot")
             else:
                 cmd = E("request-node-reboot")
                 cmd.append(E("node", on_node))
@@ -1220,10 +1502,25 @@ class SW(Util):
         else:
             cmd = E("request-reboot")
 
+        # -----------------------------------------------------------------
+        # Satellite reboot support
+        # -----------------------------------------------------------------
+        if satellite_name is not None:
+            alive_satellites = self._check_satellite_alive(satellite_name)
+            if not alive_satellites:
+                raise RpcError("No alive satellites available for reboot")
+            for sat in alive_satellites:
+                cmd.append(E("device-list", sat))
+
         try:
-            return self._system_operation(
-                cmd, in_min, at, all_re, other_re, vmhost, member_id
-            )
+            if member_id is not None:
+                for m_id in member_id:
+                    if m_id in vc_members:
+                        return self._system_operation(
+                            cmd, in_min, at, all_re, other_re, vmhost, member_id=m_id
+                        )
+            else:
+                return self._system_operation(cmd, in_min, at, all_re, other_re, vmhost)
         except RpcTimeoutError as err:
             raise err
         except Exception as err:
@@ -1232,7 +1529,9 @@ class SW(Util):
     # -------------------------------------------------------------------------
     # poweroff - system shutdown
     # -------------------------------------------------------------------------
-    def poweroff(self, in_min=0, at=None, on_node=None, all_re=True, other_re=False):
+    def poweroff(
+        self, in_min=0, at=None, on_node=None, all_re=True, other_re=False, vmhost=False
+    ):
         """
         Perform a system shutdown, with optional delay (in minutes) .
 
@@ -1254,6 +1553,8 @@ class SW(Util):
         :param str other_re: If the system has dual Routing Engines and this option is C(true),
             then the action is performed on the other REs in the system.
 
+        :param str vmhost: If the device is vmhost device then the shutdown will be performed on the device
+
         :returns:
             * power-off message (string) if command successful
 
@@ -1267,12 +1568,13 @@ class SW(Util):
             else:
                 cmd = E("request-node-power-off")
                 cmd.append(E("node", on_node))
+        elif vmhost is True:
+            cmd = E("request-vmhost-poweroff")
+            all_re = False
         else:
             cmd = E("request-power-off")
         try:
-            return self._system_operation(
-                cmd, in_min, at, all_re, other_re, vmhost=False
-            )
+            return self._system_operation(cmd, in_min, at, all_re, other_re, vmhost)
         except Exception as err:
             if err.rsp.findtext(".//error-severity") != "warning":
                 raise err
@@ -1311,26 +1613,37 @@ class SW(Util):
         except Exception as err:
             raise err
 
-    def zeroize(self, all_re=False, media=None):
+    def zeroize(self, all_re=False, media=None, vmhost=False):
         """
         Restore the system (configuration, log files, etc.) to a
         factory default state. This is the equivalent of the
-        C(request system zeroize) CLI command.
+        C(request system zeroize) CLI command, or
+        C(request vmhost zeroize) for VMHost-based platforms
+        (e.g. SRX1600, SRX2300, SRX4300).
 
         :param bool all_re: In case of dual re or VC setup, function by default
             will halt all. If all is False will only halt connected device
 
         :param str media: Overwrite media when performing the zeroize operation.
 
+        :param bool vmhost:
+            (Optional) When ``True``, issue the ``request vmhost zeroize``
+            command instead of ``request system zeroize``.  Required for
+            VMHost-based SRX platforms (SRX1600, SRX2300, SRX4300).
+            The default is ``False``.
+
         :returns:
             * rpc response message (string) if command successful
         """
-        cmd = E("request-system-zeroize")
-        if all_re is False:
-            if self._dev.facts["2RE"]:
-                cmd = E("local")
-            if media is True:
-                cmd = E("media")
+        if vmhost is True:
+            cmd = E("request-vmhost-zeroize")
+        else:
+            cmd = E("request-system-zeroize")
+            if all_re is False:
+                if self._dev.facts["2RE"]:
+                    cmd = E("local")
+                if media is True:
+                    cmd = E("media")
 
         # initialize an empty output message
         output_msg = ""
@@ -1383,15 +1696,27 @@ class SW(Util):
     # rollback - clears the install request
     # -------------------------------------------------------------------------
 
-    def rollback(self):
+    def rollback(self, satellite_name=None):
         """
         Issues the 'request' command to do the rollback and returns the string
         output of the results.
 
+        :param satellite_name:
+            (Optional) A satellite name (str) or list of satellite names to
+            rollback.  Only satellites whose ``alive`` status is ``up`` will
+            be included.
+
         :returns:
             Rollback results (str)
         """
-        rsp = self.rpc.request_package_rollback()
+        kwargs = {}
+        if satellite_name is not None:
+            alive_satellites = self._check_satellite_alive(satellite_name)
+            if not alive_satellites:
+                raise SwRollbackError(rsp="No alive satellites available for rollback")
+            kwargs["device_list"] = alive_satellites
+
+        rsp = self.rpc.request_package_rollback(**kwargs)
         fail_list = ["Cannot rollback", "rollback aborted"]
         multi = rsp.xpath("//multi-routing-engine-item")
         if multi:

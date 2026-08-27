@@ -1,17 +1,16 @@
+import json
+import sys
 import warnings
 from contextlib import contextmanager
 from copy import deepcopy
-from lxml import etree
-import json
-import sys
-from jinja2 import Template, meta
 
-from jnpr.junos.factory.viewfields import ViewFields
+from jnpr.junos.factory.safe_eval import eval_jinja_expression
 from jnpr.junos.factory.to_json import TableViewJSONEncoder
+from jnpr.junos.factory.viewfields import ViewFields
+from lxml import etree
 
 
 class View(object):
-
     """
     View is the base-class that makes extracting values from XML
     data appear as objects with attributes.
@@ -254,10 +253,7 @@ class View(object):
         """
         expression = self.EVAL.get(name)
         if expression:
-            variables = meta.find_undeclared_variables(expression)
-            t = Template(expression)
-            expression = t.render({k: self.__getitem__(k) for k in variables})
-            val = eval(expression)
+            val = eval_jinja_expression(expression, lambda k: self.__getitem__(k))
             setattr(self, name, val)
             return val
 

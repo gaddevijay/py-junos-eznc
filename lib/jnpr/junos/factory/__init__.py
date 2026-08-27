@@ -1,6 +1,6 @@
-import yaml
 import os.path
 
+import yaml
 from jnpr.junos.factory.factory_loader import FactoryLoader
 
 __all__ = ["loadyaml", "FactoryLoader"]
@@ -30,4 +30,4 @@ def loadyaml(path):
     # if no extension is given, default to '.yml'
     if os.path.splitext(path)[1] == "":
         path += ".yml"
-    return FactoryLoader().load(yaml.load(open(path, "r"), Loader=yaml.FullLoader))
+    return FactoryLoader().load(yaml.load(open(path, "r"), Loader=yaml.SafeLoader))

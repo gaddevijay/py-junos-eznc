@@ -2,12 +2,12 @@ __author__ = "Rick Sherman, Nitin Kumar"
 __credits__ = "Jeremy Schulman"
 
 import unittest
-from nose.plugins.attrib import attr
+from unittest.mock import patch
+
+import nose2
 from jnpr.junos.factory import FactoryLoader
-from mock import patch
 
 
-@attr("unit")
 class TestFactoryLoader(unittest.TestCase):
     def setUp(self):
         self.fl = FactoryLoader()

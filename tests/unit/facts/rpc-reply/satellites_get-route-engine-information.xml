@@ -1,0 +1,19 @@
+<rpc-reply xmlns:junos="http://xml.juniper.net/junos/26.3I20260309_1406_babud/junos">
+    <satellite-device-information>
+        <satellite-device>
+            <satellite-mgmt-ip>satellite_one</satellite-mgmt-ip>
+            <route-engine-information>
+                <route-engine>
+                    <slot>0</slot>
+                    <mastership-state>master</mastership-state>
+                    <mastership-priority>master (default)</mastership-priority>
+                    <status>OK</status>
+                    <model>RE-VMX</model>
+                    <serial-number>574b94ec-68</serial-number>
+                    <up-time>36 minutes, 28 seconds</up-time>
+                    <last-reboot-reason>Router rebooted after a normal shutdown.</last-reboot-reason>
+                </route-engine>
+            </route-engine-information>
+        </satellite-device>
+    </satellite-device-information>
+</rpc-reply>

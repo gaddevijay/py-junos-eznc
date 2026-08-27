@@ -2,14 +2,13 @@ __author__ = "Nitin Kumar, Rick Sherman"
 __credits__ = "Jeremy Schulman"
 
 import unittest
-from mock import patch
-from nose.plugins.attrib import attr
+from unittest.mock import patch
 
+import nose2
 from jnpr.junos import Device
 from jnpr.junos.ofacts.ifd_style import facts_ifd_style as ifd_style
 
 
-@attr("unit")
 class TestIFDStyle(unittest.TestCase):
     @patch("jnpr.junos.device.warnings")
     def setUp(self, mock_warnings):

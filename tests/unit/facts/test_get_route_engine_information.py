@@ -1,19 +1,17 @@
 __author__ = "Stacy Smith"
 __credits__ = "Jeremy Schulman, Nitin Kumar"
 
-import unittest
-from nose.plugins.attrib import attr
-from mock import patch, MagicMock
 import os
-from lxml import etree
+import unittest
+from unittest.mock import MagicMock, patch
 
+import nose2
 from jnpr.junos import Device
-
+from lxml import etree
 from ncclient.manager import Manager, make_device_handler
 from ncclient.transport import SSHSession
 
 
-@attr("unit")
 class TestGetRouteEngineInformation(unittest.TestCase):
     @patch("ncclient.manager.connect")
     def setUp(self, mock_connect):

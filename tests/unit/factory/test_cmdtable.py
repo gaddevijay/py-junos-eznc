@@ -1,23 +1,21 @@
 __author__ = "Nitin Kumar"
 __credits__ = "Jeremy Schulman"
 
-import unittest
+import json
 import os
-from nose.plugins.attrib import attr
+import unittest
+from unittest.mock import MagicMock, patch
 
+import nose2
+import yaml
 from jnpr.junos import Device
 from jnpr.junos.exception import RpcError
-
+from jnpr.junos.factory.factory_loader import FactoryLoader
 from ncclient.manager import Manager, make_device_handler
 from ncclient.transport import SSHSession
-from mock import MagicMock, patch
-import yamlordereddictloader
-from jnpr.junos.factory.factory_loader import FactoryLoader
-import yaml
-import json
+from yamlloader import ordereddict
 
 
-@attr("unit")
 class TestFactoryCMDTable(unittest.TestCase):
     @patch("ncclient.manager.connect")
     def setUp(self, mock_connect):
@@ -49,9 +47,7 @@ CMErrorView:
     - name
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -84,9 +80,7 @@ sysctlView:
         veriexec-state: '(.*)'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = sysctlVeriexecTable(self.dev)
         stats = stats.get()
@@ -125,9 +119,7 @@ CMErrorView:
     data: ModuleData
     """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -187,9 +179,7 @@ CMErrorView:
     errors: Active Errors
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev)
         stats.view = globals()["CMErrorView"]
@@ -211,9 +201,7 @@ CMErrorView:
     errors: Active Errors
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev)
 
@@ -239,9 +227,7 @@ CMErrorView:
     name: Name
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev)
         with patch("jnpr.junos.utils.start_shell.StartShell.run") as ss_run:
@@ -266,9 +252,7 @@ CMErrorView:
         errors: Active Errors
     """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev)
         stats.get(key="module", key_items=[1], filters=["errors"])
@@ -292,9 +276,7 @@ CMErrorView:
         errors: Active Errors
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CMErrorTable(self.dev).get()
         self.assertEqual(stats.VIEW.T.__class__.__name__, "property")
@@ -326,9 +308,7 @@ FPCLinkStatTable:
   delimiter: ":"
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = FPCLinkStatTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -352,7 +332,7 @@ FPCLinkStatTable:
     @patch("jnpr.junos.Device.execute")
     def test_title_in_view(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 ShowLuchipTable:
   command: show luchip {{ lu_instance }}
@@ -370,9 +350,7 @@ ShowLuchipView:
     active_zones: '\((0x[a-z0-9]+)\)'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ShowLuchipTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -473,9 +451,7 @@ FPCLinkStatTable:
     delimiter: ":"
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = FPCLinkStatTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -499,7 +475,7 @@ FPCLinkStatTable:
     @patch("jnpr.junos.Device.execute")
     def test_field_eval(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 XMChipStatsTable:
   command: show xmchip {{ instance }} pt stats
@@ -517,9 +493,7 @@ XMChipStatsView:
     total_pct: '{{ pct_wi_1 }} + {{ pct_wi_0 }}'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = XMChipStatsTable(self.dev)
         stats = stats.get(target="fpc1", args={"instance": 0})
@@ -536,9 +510,7 @@ FPCLinkStatTable:
     delimiter: ":"
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = FPCLinkStatTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -635,9 +607,7 @@ FPCTTPReceiveStatsView:
     discard: Discard
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = FPCTTPStatsTable(self.dev)
         stats = stats.get(target="fpc2")
@@ -676,7 +646,7 @@ FPCTTPReceiveStatsView:
     @patch("jnpr.junos.Device.execute")
     def test_unstructured_mtip_cge_regex(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 MtipCgeSummaryTable:
   command: show mtip-cge summary
@@ -709,9 +679,7 @@ MtipCgeStatisticsTable:
     - aInRangeLengthErrors
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = MtipCgeSummaryTable(self.dev)
         stats = stats.get(target="fpc2")
@@ -803,9 +771,7 @@ _ICMPRateView:
     name: words
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ICMPStatsTable(self.dev)
         stats = stats.get(target="fpc2")
@@ -878,7 +844,7 @@ _ICMPRateView:
     @patch("jnpr.junos.Device.execute")
     def test_unstructured_ithrottle_key_args(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 IthrottleIDTable:
   command: show ithrottle id {{ id }}
   args:
@@ -904,9 +870,7 @@ _ThrottleStatsTable:
       - Enables
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = IthrottleIDTable(self.dev).get(target="fpc2")
         self.assertEqual(
@@ -922,7 +886,7 @@ _ThrottleStatsTable:
     @patch("jnpr.junos.Device.execute")
     def test_pci_errs_multi_key_regex(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 ShowPciErrorsTable:
   command: show pci errors {{ pci_controller_number }}
@@ -945,9 +909,7 @@ ShowPciErrorsView:
     - status
     """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ShowPciErrorsTable(self.dev).get()
         self.assertEqual(
@@ -987,9 +949,7 @@ FPCMemoryView:
       - base
         """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = FPCMemory(self.dev).get()
         self.assertEqual(
@@ -1025,7 +985,7 @@ FPCMemoryView:
     @patch("jnpr.junos.Device.execute")
     def test_item_regex_pq3_pci(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 PQ3PCITable:
   command: show pq3 pci
@@ -1045,9 +1005,7 @@ PQ3PCI:
     btlp: 'btlp (\d+)'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = PQ3PCITable(self.dev)
         stats = stats.get(target="fpc2")
@@ -1148,7 +1106,7 @@ PQ3PCI:
     @patch("jnpr.junos.Device.execute")
     def test_regex_with_fields(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 SchedulerTable:
   command: show sched
@@ -1171,9 +1129,7 @@ _TopThreadTable:
   delimiter: "="
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = SchedulerTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -1208,9 +1164,7 @@ HostlbStatusSummaryView:
     no_toolkit_errors: No toolkit errors
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = HostlbStatusSummaryTable(self.dev)
         stats = stats.get(target="fpc3")
@@ -1234,9 +1188,7 @@ HostlbStatusSummaryView:
     no_toolkit_errors: No toolkit errors
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = HostlbStatusSummaryTable(
             path=os.path.join(
@@ -1253,7 +1205,7 @@ HostlbStatusSummaryView:
     @patch("jnpr.junos.Device.execute")
     def test_table_with_item_regex(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 DevicesLocalTable:
   command: show devices local
@@ -1310,9 +1262,7 @@ _TransmitPerQueueView:
     packets: '(\d+) packets'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = DevicesLocalTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -1355,7 +1305,7 @@ _TransmitPerQueueView:
     @patch("jnpr.junos.Device.execute")
     def test_table_item_group_key_mismatch(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 DevicesLocalTable:
   command: show devices local
@@ -1381,9 +1331,7 @@ _ReceiveView:
     broadcast_packets: '(\d+) broadcast packets'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = DevicesLocalTable(self.dev)
         self.assertRaises(KeyError, stats.get)
@@ -1391,7 +1339,7 @@ _ReceiveView:
     @patch("jnpr.junos.Device.execute")
     def test_table_with_item_without_view(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 EthernetSwitchStatisticsIterTable:
   command: show chassis ethernet-switch statistics
@@ -1401,9 +1349,7 @@ EthernetSwitchStatisticsIterTable:
     - fpc
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = EthernetSwitchStatisticsIterTable(self.dev)
         stats = stats.get()
@@ -1531,9 +1477,7 @@ _EthSwitchStatsFpc5Table:
   title: Statistics for port 5 connected to device FPC5
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = EthernetSwitchStatistics(self.dev)
         stats = stats.get()
@@ -1630,7 +1574,7 @@ _EthSwitchStatsFpc5Table:
     @patch("jnpr.junos.Device.execute")
     def test_valueerror_with_no_target(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 ShowToePfePacketStatsTable:
   command: show toe pfe {{ pfe_instance }} {{ asic_type }} {{ asic_instance }} toe-inst {{ toe_instance }} packet-stats
@@ -1688,9 +1632,7 @@ _ShowToePfePacketStatsStream_rx_errors:
   delimiter: ':'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ShowToePfePacketStatsTable(self.dev)
         self.assertRaises(ValueError, stats.get)
@@ -1698,7 +1640,7 @@ _ShowToePfePacketStatsStream_rx_errors:
     @patch("jnpr.junos.Device.execute")
     def test_item_with_fields_delimiter(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 ShowToePfePacketStatsTable:
   command: show toe pfe {{ pfe_instance }} {{ asic_type }} {{ asic_instance }} toe-inst {{ toe_instance }} packet-stats
@@ -1756,9 +1698,7 @@ _ShowToePfePacketStatsStream_rx_errors:
   delimiter: ':'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ShowToePfePacketStatsTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -2083,7 +2023,7 @@ XMChipInterruptStatsTable:
     - name
   view: XMChipInterruptStatsView
   eval:
-    total_interrupt: "reduce(lambda x,y: x+y, [v['interrupts'] for k,v in {{ data }}.items() if 'cookie_sz_err' in v.get('name')])"
+        total_interrupt: "sum([v['interrupts'] for k,v in {{ data }}.items() if isinstance(v, dict) and 'cookie_sz_err' in v['name']])"
 
 XMChipInterruptStatsView:
   columns:
@@ -2093,9 +2033,7 @@ XMChipInterruptStatsView:
     last_occurance: Last Occurrence
     """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = XMChipInterruptStatsTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -2126,9 +2064,7 @@ XMChipInterruptStatsView:
     last_occurance: Last Occurrence
         """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = XMChipInterruptStatsTable(self.dev)
         stats = stats.get(target="fpc1")
@@ -2160,148 +2096,146 @@ FPCThreadView:
     - state
             """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = FPCThreads(self.dev)
         stats = stats.get()
         self.assertEqual(
             dict(stats),
             {
-                u"100ms Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"10s Low Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"10s Medium Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"1s Low Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"1s Medium Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"50ms Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"CFM Data thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"CFM Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"CFP": {u"cpu": u"0", u"state": u"asleep"},
-                u"CLKSYNC Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"CLNS Err Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"CLNS Option Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"CXP": {u"cpu": u"0", u"state": u"asleep"},
-                u"Cassis Free Timer": {u"cpu": u"3", u"state": u"asleep"},
-                u"Cattle-Prod Daemon": {u"cpu": u"0", u"state": u"asleep"},
-                u"Console": {u"cpu": u"0", u"state": u"asleep"},
-                u"Cube Server": {u"cpu": u"0", u"state": u"asleep"},
-                u"DCC Background": {u"cpu": u"0", u"state": u"asleep"},
-                u"DDOS Policers": {u"cpu": u"0", u"state": u"asleep"},
-                u"DFW Alert": {u"cpu": u"0", u"state": u"asleep"},
-                u"DSX50ms": {u"cpu": u"0", u"state": u"asleep"},
-                u"DSXonesec": {u"cpu": u"0", u"state": u"asleep"},
-                u"Firmware Upgrade": {u"cpu": u"0", u"state": u"asleep"},
-                u"GR253": {u"cpu": u"0", u"state": u"asleep"},
-                u"HSL2": {u"cpu": u"0", u"state": u"asleep"},
-                u"Heap Accouting": {u"cpu": u"0", u"state": u"asleep"},
-                u"Host Loopback Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"ICMP Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"ICMP6 Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"IFCM": {u"cpu": u"0", u"state": u"asleep"},
-                u"IGMP": {u"cpu": u"0", u"state": u"asleep"},
-                u"IGMP Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"IP Option Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"IP Reassembly": {u"cpu": u"0", u"state": u"asleep"},
-                u"IP6 Option Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"IPC Test Daemon": {u"cpu": u"0", u"state": u"asleep"},
-                u"IPv4 PFE Control Background": {u"cpu": u"0", u"state": u"asleep"},
-                u"JNH Exception Counter Background Thread": {
-                    u"cpu": u"0",
-                    u"state": u"asleep",
+                "100ms Periodic": {"cpu": "0", "state": "asleep"},
+                "10s Low Periodic": {"cpu": "0", "state": "asleep"},
+                "10s Medium Periodic": {"cpu": "0", "state": "asleep"},
+                "1s Low Periodic": {"cpu": "0", "state": "asleep"},
+                "1s Medium Periodic": {"cpu": "0", "state": "asleep"},
+                "50ms Periodic": {"cpu": "0", "state": "asleep"},
+                "CFM Data thread": {"cpu": "0", "state": "asleep"},
+                "CFM Manager": {"cpu": "0", "state": "asleep"},
+                "CFP": {"cpu": "0", "state": "asleep"},
+                "CLKSYNC Manager": {"cpu": "0", "state": "asleep"},
+                "CLNS Err Input": {"cpu": "0", "state": "asleep"},
+                "CLNS Option Input": {"cpu": "0", "state": "asleep"},
+                "CXP": {"cpu": "0", "state": "asleep"},
+                "Cassis Free Timer": {"cpu": "3", "state": "asleep"},
+                "Cattle-Prod Daemon": {"cpu": "0", "state": "asleep"},
+                "Console": {"cpu": "0", "state": "asleep"},
+                "Cube Server": {"cpu": "0", "state": "asleep"},
+                "DCC Background": {"cpu": "0", "state": "asleep"},
+                "DDOS Policers": {"cpu": "0", "state": "asleep"},
+                "DFW Alert": {"cpu": "0", "state": "asleep"},
+                "DSX50ms": {"cpu": "0", "state": "asleep"},
+                "DSXonesec": {"cpu": "0", "state": "asleep"},
+                "Firmware Upgrade": {"cpu": "0", "state": "asleep"},
+                "GR253": {"cpu": "0", "state": "asleep"},
+                "HSL2": {"cpu": "0", "state": "asleep"},
+                "Heap Accouting": {"cpu": "0", "state": "asleep"},
+                "Host Loopback Periodic": {"cpu": "0", "state": "asleep"},
+                "ICMP Input": {"cpu": "0", "state": "asleep"},
+                "ICMP6 Input": {"cpu": "0", "state": "asleep"},
+                "IFCM": {"cpu": "0", "state": "asleep"},
+                "IGMP": {"cpu": "0", "state": "asleep"},
+                "IGMP Input": {"cpu": "0", "state": "asleep"},
+                "IP Option Input": {"cpu": "0", "state": "asleep"},
+                "IP Reassembly": {"cpu": "0", "state": "asleep"},
+                "IP6 Option Input": {"cpu": "0", "state": "asleep"},
+                "IPC Test Daemon": {"cpu": "0", "state": "asleep"},
+                "IPv4 PFE Control Background": {"cpu": "0", "state": "asleep"},
+                "JNH Exception Counter Background Thread": {
+                    "cpu": "0",
+                    "state": "asleep",
                 },
-                u"JNH KA Transmit": {u"cpu": u"0", u"state": u"asleep"},
-                u"JNH Partition Mem Recovery": {u"cpu": u"0", u"state": u"asleep"},
-                u"L2ALM Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"L2PD": {u"cpu": u"0", u"state": u"asleep"},
-                u"L2TP-SF KA Transmit": {u"cpu": u"0", u"state": u"asleep"},
-                u"LKUP ASIC UCODE Rebalance Service": {
-                    u"cpu": u"1",
-                    u"state": u"asleep",
+                "JNH KA Transmit": {"cpu": "0", "state": "asleep"},
+                "JNH Partition Mem Recovery": {"cpu": "0", "state": "asleep"},
+                "L2ALM Manager": {"cpu": "0", "state": "asleep"},
+                "L2PD": {"cpu": "0", "state": "asleep"},
+                "L2TP-SF KA Transmit": {"cpu": "0", "state": "asleep"},
+                "LKUP ASIC UCODE Rebalance Service": {
+                    "cpu": "1",
+                    "state": "asleep",
                 },
-                u"LKUP ASIC Wedge poll thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"LU Background Service": {u"cpu": u"4", u"state": u"asleep"},
-                u"LU-CNTR Reader": {u"cpu": u"0", u"state": u"asleep"},
-                u"MSA300PIN": {u"cpu": u"0", u"state": u"asleep"},
-                u"Maintenance": {u"cpu": u"0", u"state": u"asleep"},
-                u"NH Probe Service": {u"cpu": u"0", u"state": u"asleep"},
-                u"OTN": {u"cpu": u"0", u"state": u"asleep"},
-                u"PFE Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"PFE Statistics": {u"cpu": u"0", u"state": u"asleep"},
-                u"PFEMAN SRRD Thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"PFEMAN Service Thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"PIC": {u"cpu": u"0", u"state": u"asleep"},
-                u"PIC Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"PPM Data thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"PPM Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"PQ3 PCI Periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"PRECL Chip Generic": {u"cpu": u"0", u"state": u"asleep"},
-                u"PZARB Timeout": {u"cpu": u"0", u"state": u"asleep"},
-                u"Pfesvcsor": {u"cpu": u"0", u"state": u"asleep"},
-                u"QSFP": {u"cpu": u"0", u"state": u"asleep"},
-                u"RCM Pfe Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"RDMAN": {u"cpu": u"0", u"state": u"asleep"},
-                u"RDP Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"RDP Timers": {u"cpu": u"0", u"state": u"asleep"},
-                u"RFC2544 periodic": {u"cpu": u"0", u"state": u"asleep"},
-                u"RPM Msg thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"RSMON syslog thread": {u"cpu": u"0", u"state": u"asleep"},
-                u"SFP": {u"cpu": u"0", u"state": u"asleep"},
-                u"SNTP Daemon": {u"cpu": u"0", u"state": u"asleep"},
-                u"Services TOD": {u"cpu": u"0", u"state": u"asleep"},
-                u"Sheaf Background": {u"cpu": u"0", u"state": u"asleep"},
-                u"Stats Page Ager": {u"cpu": u"0", u"state": u"asleep"},
-                u"Syslog": {u"cpu": u"0", u"state": u"asleep"},
-                u"TCP Receive": {u"cpu": u"0", u"state": u"asleep"},
-                u"TCP Timers": {u"cpu": u"0", u"state": u"asleep"},
-                u"TNP Hello": {u"cpu": u"0", u"state": u"asleep"},
-                u"TNPC CM": {u"cpu": u"0", u"state": u"asleep"},
-                u"TOE Coredump": {u"cpu": u"0", u"state": u"asleep"},
-                u"TTP Receive": {u"cpu": u"0", u"state": u"asleep"},
-                u"TTP Transmit": {u"cpu": u"0", u"state": u"asleep"},
-                u"TTRACE Creator": {u"cpu": u"0", u"state": u"asleep"},
-                u"TTRACE Tracer": {u"cpu": u"0", u"state": u"asleep"},
-                u"Timer Services": {u"cpu": u"0", u"state": u"asleep"},
-                u"Trap_Info Read PFE 0.0": {u"cpu": u"0", u"state": u"asleep"},
-                u"Trap_Info Read PFE 0.1": {u"cpu": u"0", u"state": u"asleep"},
-                u"Trap_Info Read PFE 1.0": {u"cpu": u"0", u"state": u"asleep"},
-                u"Trap_Info Read PFE 1.1": {u"cpu": u"0", u"state": u"asleep"},
-                u"UDP Input": {u"cpu": u"0", u"state": u"asleep"},
-                u"Ukern Syslog": {u"cpu": u"0", u"state": u"asleep"},
-                u"VBF MC Purge": {u"cpu": u"0", u"state": u"asleep"},
-                u"VBF PFE Events": {u"cpu": u"0", u"state": u"asleep"},
-                u"VBF Walker": {u"cpu": u"0", u"state": u"asleep"},
-                u"VRRP Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"Virtual Console": {u"cpu": u"0", u"state": u"asleep"},
-                u"XFP": {u"cpu": u"0", u"state": u"asleep"},
-                u"XM Chip Generic": {u"cpu": u"0", u"state": u"asleep"},
-                u"XM Chip Statistics": {u"cpu": u"0", u"state": u"asleep"},
-                u"XM Chip Wedge Detection and Recovery": {
-                    u"cpu": u"0",
-                    u"state": u"asleep",
+                "LKUP ASIC Wedge poll thread": {"cpu": "0", "state": "asleep"},
+                "LU Background Service": {"cpu": "4", "state": "asleep"},
+                "LU-CNTR Reader": {"cpu": "0", "state": "asleep"},
+                "MSA300PIN": {"cpu": "0", "state": "asleep"},
+                "Maintenance": {"cpu": "0", "state": "asleep"},
+                "NH Probe Service": {"cpu": "0", "state": "asleep"},
+                "OTN": {"cpu": "0", "state": "asleep"},
+                "PFE Manager": {"cpu": "0", "state": "asleep"},
+                "PFE Statistics": {"cpu": "0", "state": "asleep"},
+                "PFEMAN SRRD Thread": {"cpu": "0", "state": "asleep"},
+                "PFEMAN Service Thread": {"cpu": "0", "state": "asleep"},
+                "PIC": {"cpu": "0", "state": "asleep"},
+                "PIC Periodic": {"cpu": "0", "state": "asleep"},
+                "PPM Data thread": {"cpu": "0", "state": "asleep"},
+                "PPM Manager": {"cpu": "0", "state": "asleep"},
+                "PQ3 PCI Periodic": {"cpu": "0", "state": "asleep"},
+                "PRECL Chip Generic": {"cpu": "0", "state": "asleep"},
+                "PZARB Timeout": {"cpu": "0", "state": "asleep"},
+                "Pfesvcsor": {"cpu": "0", "state": "asleep"},
+                "QSFP": {"cpu": "0", "state": "asleep"},
+                "RCM Pfe Manager": {"cpu": "0", "state": "asleep"},
+                "RDMAN": {"cpu": "0", "state": "asleep"},
+                "RDP Input": {"cpu": "0", "state": "asleep"},
+                "RDP Timers": {"cpu": "0", "state": "asleep"},
+                "RFC2544 periodic": {"cpu": "0", "state": "asleep"},
+                "RPM Msg thread": {"cpu": "0", "state": "asleep"},
+                "RSMON syslog thread": {"cpu": "0", "state": "asleep"},
+                "SFP": {"cpu": "0", "state": "asleep"},
+                "SNTP Daemon": {"cpu": "0", "state": "asleep"},
+                "Services TOD": {"cpu": "0", "state": "asleep"},
+                "Sheaf Background": {"cpu": "0", "state": "asleep"},
+                "Stats Page Ager": {"cpu": "0", "state": "asleep"},
+                "Syslog": {"cpu": "0", "state": "asleep"},
+                "TCP Receive": {"cpu": "0", "state": "asleep"},
+                "TCP Timers": {"cpu": "0", "state": "asleep"},
+                "TNP Hello": {"cpu": "0", "state": "asleep"},
+                "TNPC CM": {"cpu": "0", "state": "asleep"},
+                "TOE Coredump": {"cpu": "0", "state": "asleep"},
+                "TTP Receive": {"cpu": "0", "state": "asleep"},
+                "TTP Transmit": {"cpu": "0", "state": "asleep"},
+                "TTRACE Creator": {"cpu": "0", "state": "asleep"},
+                "TTRACE Tracer": {"cpu": "0", "state": "asleep"},
+                "Timer Services": {"cpu": "0", "state": "asleep"},
+                "Trap_Info Read PFE 0.0": {"cpu": "0", "state": "asleep"},
+                "Trap_Info Read PFE 0.1": {"cpu": "0", "state": "asleep"},
+                "Trap_Info Read PFE 1.0": {"cpu": "0", "state": "asleep"},
+                "Trap_Info Read PFE 1.1": {"cpu": "0", "state": "asleep"},
+                "UDP Input": {"cpu": "0", "state": "asleep"},
+                "Ukern Syslog": {"cpu": "0", "state": "asleep"},
+                "VBF MC Purge": {"cpu": "0", "state": "asleep"},
+                "VBF PFE Events": {"cpu": "0", "state": "asleep"},
+                "VBF Walker": {"cpu": "0", "state": "asleep"},
+                "VRRP Manager": {"cpu": "0", "state": "asleep"},
+                "Virtual Console": {"cpu": "0", "state": "asleep"},
+                "XFP": {"cpu": "0", "state": "asleep"},
+                "XM Chip Generic": {"cpu": "0", "state": "asleep"},
+                "XM Chip Statistics": {"cpu": "0", "state": "asleep"},
+                "XM Chip Wedge Detection and Recovery": {
+                    "cpu": "0",
+                    "state": "asleep",
                 },
-                u"bulkget Manager": {u"cpu": u"0", u"state": u"asleep"},
-                u"cos halp stats daemon": {u"cpu": u"0", u"state": u"asleep"},
-                u"jnh errors daemon": {u"cpu": u"0", u"state": u"asleep"},
-                u"mac_db": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlAprTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlHybridTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlInt08Taskzl303xx": {u"cpu": u"1", u"state": u"asleep"},
-                u"zlInt09Taskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlPktTxSchedTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlPtpTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlSpllTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlTimerTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlTodMgrTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlTsEngTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
-                u"zlTxTsMgrTaskzl303xx": {u"cpu": u"0", u"state": u"asleep"},
+                "bulkget Manager": {"cpu": "0", "state": "asleep"},
+                "cos halp stats daemon": {"cpu": "0", "state": "asleep"},
+                "jnh errors daemon": {"cpu": "0", "state": "asleep"},
+                "mac_db": {"cpu": "0", "state": "asleep"},
+                "zlAprTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlHybridTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlInt08Taskzl303xx": {"cpu": "1", "state": "asleep"},
+                "zlInt09Taskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlPktTxSchedTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlPtpTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlSpllTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlTimerTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlTodMgrTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlTsEngTaskzl303xx": {"cpu": "0", "state": "asleep"},
+                "zlTxTsMgrTaskzl303xx": {"cpu": "0", "state": "asleep"},
             },
         )
 
     @patch("jnpr.junos.Device.execute")
     def test_new_line_in_data(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
-        yaml_data = """
+        yaml_data = r"""
 ---
 CChipLoStatsTable:
   command: show xmchip {{ chip_instance }} lo stats 0
@@ -2327,9 +2261,7 @@ CChipLoStatsView:
     rate: '\d+ pps'
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = CChipLoStatsTable(self.dev)
         stats = stats.get(target="fpc0")
@@ -2355,9 +2287,7 @@ ARPview:
       flag: FLAGS
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ARPtable(self.dev)
         stats = stats.get()
@@ -2386,9 +2316,7 @@ ARPview:
         flag: FLAGS
 """
         globals().update(
-            FactoryLoader().load(
-                yaml.load(yaml_data, Loader=yamlordereddictloader.Loader)
-            )
+            FactoryLoader().load(yaml.load(yaml_data, Loader=ordereddict.Loader))
         )
         stats = ARPtable(self.dev)
         stats = stats.get()

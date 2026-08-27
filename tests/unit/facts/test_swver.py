@@ -7,12 +7,11 @@ try:
     import unittest2 as unittest
 except:
     import unittest
-from nose.plugins.attrib import attr
 
-from jnpr.junos.facts.swver import version_info, get_facts
+import nose2
+from jnpr.junos.facts.swver import get_facts, version_info
 
 
-@attr("unit")
 class TestVersionInfo(unittest.TestCase):
     if six.PY2:
         assertCountEqual = unittest.TestCase.assertItemsEqual
@@ -38,7 +37,7 @@ class TestVersionInfo(unittest.TestCase):
     def test_version_info_repr(self):
         self.assertEqual(
             repr(version_info("11.4R7.5")),
-            "junos.version_info(major=(11, 4), " "type=R, minor=7, build=5)",
+            "junos.version_info(major=(11, 4), type=R, minor=7, build=5)",
         )
 
     def test_version_info_lt(self):

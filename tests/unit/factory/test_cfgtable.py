@@ -1,22 +1,19 @@
 __author__ = "Rick Sherman, Nitin Kumar"
 __credits__ = "Jeremy Schulman"
 
-import unittest
 import os
 import sys
+import unittest
+from unittest.mock import MagicMock, patch
 
-from nose.plugins.attrib import attr
+import nose2
 import yaml
-
 from jnpr.junos import Device
-
-from ncclient.manager import Manager, make_device_handler
-from ncclient.transport import SSHSession
-from lxml import etree
-from mock import MagicMock, patch
-
 from jnpr.junos.factory import loadyaml
 from jnpr.junos.factory.factory_loader import FactoryLoader
+from lxml import etree
+from ncclient.manager import Manager, make_device_handler
+from ncclient.transport import SSHSession
 
 try:
     _YAML_ = loadyaml("lib/jnpr/junos/cfgro/srx")
@@ -85,7 +82,6 @@ yaml_bgp_data = """---
 globals().update(FactoryLoader().load(yaml.load(yaml_bgp_data, Loader=yaml.FullLoader)))
 
 
-@attr("unit")
 @unittest.skipIf(sys.platform == "win32", "will work for windows in coming days")
 class TestFactoryCfgTable(unittest.TestCase):
     @patch("ncclient.manager.connect")

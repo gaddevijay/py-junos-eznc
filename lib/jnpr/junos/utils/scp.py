@@ -1,7 +1,7 @@
 from __future__ import absolute_import
+
 import inspect
 
-from scp import SCPClient
 from jnpr.junos.utils.ssh_client import open_ssh_client
 
 """
@@ -43,7 +43,7 @@ class SCP(object):
             # User case also define progress with 3 params, the way scp module
             # expects. Function will take path, total size, transferred.
             # https://github.com/jbardin/scp.py/blob/master/scp.py#L97
-            spec = inspect.getargspec(self._user_progress)
+            spec = inspect.getfullargspec(self._user_progress)
             if (len(spec.args) == 3 and spec.args[0] != "self") or (
                 len(spec.args) == 4 and spec.args[0] == "self"
             ):
@@ -81,6 +81,11 @@ class SCP(object):
         # @@@ should check for multi-calls to connect to ensure we don't keep
         # @@@ opening new connections
         self._ssh = open_ssh_client(dev=self._junos)
+        # Import SCPClient here to avoid autodoc importing the external
+        # scp module at module-import time which can trigger signature
+        # formatting errors in some environments.
+        from scp import SCPClient
+
         return SCPClient(self._ssh.get_transport(), **scpargs)
 
     def close(self):

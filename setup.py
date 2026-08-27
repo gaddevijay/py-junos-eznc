@@ -1,4 +1,7 @@
-from setuptools import setup, find_packages
+import os
+
+from setuptools import find_packages, setup
+
 import versioneer
 
 # parse requirements
@@ -13,6 +16,7 @@ setup(
     author="Jeremy Schulman, Nitin Kumar, Rick Sherman, Stacy Smith",
     author_email="jnpr-community-netdev@juniper.net",
     description=("Junos 'EZ' automation for non-programmers"),
+    license_files=["LICENSE"],
     license="Apache 2.0",
     keywords="Junos NETCONF networking automation",
     url="http://www.github.com/Juniper/py-junos-eznc",
@@ -24,7 +28,7 @@ setup(
         "jnpr.junos.cfgro": ["*.yml"],
         "jnpr.junos.resources": ["*.yml"],
     },
-    python_requires=">=3.5, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",
+    python_requires=">=3.8",
     install_requires=install_reqs,
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -36,10 +40,11 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
         "Topic :: Software Development :: Libraries :: Python Modules",

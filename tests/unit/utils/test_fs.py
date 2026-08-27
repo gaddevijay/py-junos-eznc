@@ -1,22 +1,19 @@
-import unittest
-from nose.plugins.attrib import attr
 import os
+import unittest
+from unittest.mock import MagicMock, call, patch
 
+import nose2
+from jnpr.junos import Device
+from jnpr.junos.exception import RpcError
+from jnpr.junos.utils.fs import FS
+from lxml import etree
 from ncclient.manager import Manager, make_device_handler
 from ncclient.transport import SSHSession
-
-from jnpr.junos import Device
-from jnpr.junos.utils.fs import FS
-from jnpr.junos.exception import RpcError
-
-from mock import patch, MagicMock, call
-from lxml import etree
 
 __author__ = "Nitin Kumar, Rick Sherman"
 __credits__ = "Jeremy Schulman"
 
 
-@attr("unit")
 class TestFS(unittest.TestCase):
     @patch("ncclient.manager.connect")
     def setUp(self, mock_connect):

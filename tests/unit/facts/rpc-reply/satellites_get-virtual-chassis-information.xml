@@ -1,0 +1,13 @@
+<rpc-reply xmlns:junos="http://xml.juniper.net/junos/26.3I20260309_1406_babud/junos">
+    <satellite-device-information>
+        <satellite-device>
+            <satellite-mgmt-ip>satellite_one</satellite-mgmt-ip>
+            <rpc-error>
+                <error-type>protocol</error-type>
+                <error-tag>operation-failed</error-tag>
+                <error-severity>error</error-severity>
+                <error-message>the virtual-chassis-control subsystem is not running</error-message>
+            </rpc-error>
+        </satellite-device>
+    </satellite-device-information>
+</rpc-reply>

@@ -1,4 +1,5 @@
 import re as RE
+from typing import Dict
 
 
 def _get_vc_status(dev, facts):
@@ -25,18 +26,15 @@ def facts_routing_engines(junos, facts):
 
     if vc_info is not None:
         facts["vc_mode"] = vc_info.findtext(".//virtual-chassis-mode")
-        if (
-            len(vc_info.xpath(".//virtual-chassis-id-information" "[@style='fabric']"))
-            > 0
-        ):
+        if len(vc_info.xpath(".//virtual-chassis-id-information[@style='fabric']")) > 0:
             facts["vc_fabric"] = True
         vc_list = vc_info.xpath(
-            ".//member-role[starts-with(.,'Master') " "or starts-with(.,'Backup')]"
+            ".//member-role[starts-with(.,'Master') or starts-with(.,'Backup')]"
         )
         if len(vc_list) > 1:
             facts["2RE"] = True
         for member_id in vc_info.xpath(
-            ".//member-role[starts-with(.,'Master')]" "/preceding-sibling::member-id"
+            ".//member-role[starts-with(.,'Master')]/preceding-sibling::member-id"
         ):
             master.append("RE{}".format(member_id.text))
 
@@ -65,13 +63,16 @@ def facts_routing_engines(junos, facts):
         else:
             # multi-instance routing platform
             m = RE.search(r"(\d)", x_re_name[0].text)
+            slot_text = re.findtext("slot", "0")
             if vc_info is not None:
                 # => RE0-RE0 | RE0-RE1
-                re_name = "RE{}-RE{}".format(m.group(0), re.find("slot").text)
+                prefix = m.group(0) if m else "0"
+                re_name = "RE{}-RE{}".format(prefix, slot_text)
             else:
-                re_name = "RE" + m.group(0)  # => RE0 | RE1
+                prefix = m.group(0) if m else "0"
+                re_name = "RE" + prefix  # => RE0 | RE1
 
-        re_fd = {}
+        re_fd: Dict[str, str] = {}
         facts[re_name] = re_fd
         for factoid in re_facts:
             x_f = re.find(factoid)

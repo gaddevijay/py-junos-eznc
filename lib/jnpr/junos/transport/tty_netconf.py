@@ -1,18 +1,18 @@
+import logging
 import re
-import time
-from lxml import etree
 import select
 import socket
-import logging
 import sys
+import time
+from datetime import datetime, timedelta
 
+import six
+from lxml import etree
 from lxml.builder import E
 from lxml.etree import XMLSyntaxError
-from datetime import datetime, timedelta
-from ncclient.operations.rpc import RPCReply, RPCError
-from ncclient.xml_ import to_ele
-import six
+from ncclient.operations.rpc import RPCError, RPCReply
 from ncclient.transport.session import HelloHandler
+from ncclient.xml_ import to_ele
 
 
 class PY6:
@@ -38,7 +38,6 @@ logger = logging.getLogger("jnpr.junos.tty_netconf")
 
 
 class tty_netconf(object):
-
     """
     Basic Junos XML API for bootstraping through the TTY
     """
@@ -69,7 +68,9 @@ class tty_netconf(object):
             raise RuntimeError("Error: netconf not responding")
 
         self.hello = self._receive()
-        self._session_id, _ = HelloHandler.parse(self.hello.decode("utf-8"))
+        self._session_id, _ = HelloHandler.parse(
+            self.hello.decode("utf-8") if isinstance(self.hello, bytes) else self.hello
+        )
 
     def close(self, force=False):
         """issue the XML API to close the session"""
@@ -117,9 +118,9 @@ class tty_netconf(object):
         """
         if not cmd.startswith("<"):
             cmd = "<{}/>".format(cmd)
-        rpc = six.b("<rpc>{}</rpc>".format(cmd))
-        logger.info("Calling rpc: %s" % rpc)
-        self._tty.rawwrite(rpc)
+        rpc_bytes = six.b("<rpc>{}</rpc>".format(cmd))
+        logger.info("Calling rpc: %s", rpc_bytes.decode("utf-8", "replace"))
+        self._tty.rawwrite(rpc_bytes)
 
         rsp = self._receive()
         rsp = rsp.decode("utf-8") if isinstance(rsp, bytes) else rsp
@@ -198,7 +199,7 @@ class tty_netconf(object):
         try:
             rxbuf = [i.strip() for i in rxbuf if i.strip() != PY6.EMPTY_STR]
             rcvd_data = PY6.NEW_LINE.join(rxbuf)
-            logger.debug("Received: \n%s" % rcvd_data)
+            logger.debug("Received: \n%s", rcvd_data)
             parser = etree.XMLParser(
                 remove_blank_text=True, huge_tree=self._tty._huge_tree
             )

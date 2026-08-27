@@ -1,23 +1,21 @@
-import unittest
 import os
 import re
-from nose.plugins.attrib import attr
+import unittest
+from unittest.mock import MagicMock, call, patch
 
+import nose2
 from jnpr.junos.device import Device
-from jnpr.junos.rpcmeta import _RpcMetaExec
+from jnpr.junos.exception import JSONLoadError
 from jnpr.junos.facts.swver import version_info
+from jnpr.junos.rpcmeta import _RpcMetaExec
+from lxml import etree
 from ncclient.manager import Manager, make_device_handler
 from ncclient.transport import SSHSession
-from jnpr.junos.exception import JSONLoadError
-
-from mock import patch, MagicMock, call
-from lxml import etree
 
 __author__ = "Nitin Kumar, Rick Sherman"
 __credits__ = "Jeremy Schulman"
 
 
-@attr("unit")
 class Test_RpcMetaExec(unittest.TestCase):
     @patch("ncclient.manager.connect")
     def setUp(self, mock_connect):
@@ -132,7 +130,7 @@ class Test_RpcMetaExec(unittest.TestCase):
             op["system-users-information"][0]["uptime-information"][0]["date-time"][0][
                 "data"
             ],
-            u"4:43AM",
+            "4:43AM",
         )
 
     def test_rpcmeta_exec_rpc_format_json_gt_14_2(self):
@@ -143,7 +141,7 @@ class Test_RpcMetaExec(unittest.TestCase):
             op["system-users-information"][0]["uptime-information"][0]["date-time"][0][
                 "data"
             ],
-            u"4:43AM",
+            "4:43AM",
         )
 
     @patch("jnpr.junos.device.warnings")
@@ -215,7 +213,7 @@ class Test_RpcMetaExec(unittest.TestCase):
         except JSONLoadError as ex:
             self.assertTrue(
                 re.search(
-                    "Expecting '?,'? delimiter: line 17 column 39 \(char 516\)",
+                    r"Expecting '?,'? delimiter: line 17 column 39 \(char 516\)",
                     ex.ex_msg,
                 )
                 is not None

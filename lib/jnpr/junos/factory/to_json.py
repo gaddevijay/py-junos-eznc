@@ -1,12 +1,9 @@
-from jnpr.junos.jxml import strip_comments_transform
 import json
-from lxml import etree
 from copy import deepcopy
+from collections.abc import MutableMapping
 
-try:
-    from collections.abc import MutableMapping
-except ImportError:
-    from collections import MutableMapping
+from jnpr.junos.jxml import strip_comments_transform
+from lxml import etree
 
 
 class TableJSONEncoder(json.JSONEncoder):
@@ -15,9 +12,9 @@ class TableJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, obj):
-        from jnpr.junos.factory.view import View
-        from jnpr.junos.factory.table import Table
         from jnpr.junos.factory.cmdtable import CMDTable
+        from jnpr.junos.factory.table import Table
+        from jnpr.junos.factory.view import View
 
         if isinstance(obj, View):
             obj = dict(obj.items())
@@ -42,8 +39,8 @@ class TableViewJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, obj):
-        from jnpr.junos.factory.view import View
         from jnpr.junos.factory.table import Table
+        from jnpr.junos.factory.view import View
 
         if isinstance(obj, View):
             obj = {str(obj.name): dict(obj.items())}

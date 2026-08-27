@@ -1,0 +1,14 @@
+<rpc-reply xmlns:junos="http://xml.juniper.net/junos/26.3I20260309_1406_babud/junos">
+    <satellite-device-information>
+        <satellite-device>
+            <satellite-mgmt-ip>satellite_two</satellite-mgmt-ip>
+            <software-information>
+                <host-name>r1_re0</host-name>
+                <product-model>mx960</product-model>
+                <product-name>mx960</product-name>
+                <os-name>junos</os-name>
+                <junos-version>26.3I20260309_1406_babud</junos-version>
+            </software-information>
+        </satellite-device>
+    </satellite-device-information>
+</rpc-reply>

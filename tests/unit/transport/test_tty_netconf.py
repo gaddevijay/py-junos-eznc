@@ -2,17 +2,18 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from nose.plugins.attrib import attr
-from mock import MagicMock, patch
-from jnpr.junos.transport.tty_netconf import tty_netconf
-import six
+
 import os
 import select
 import socket
+from unittest.mock import MagicMock, patch
+
+import nose2
+import six
+from jnpr.junos.transport.tty_netconf import tty_netconf
 from ncclient.operations import RPCError
 
 
-@attr("unit")
 class TestTTYNetconf(unittest.TestCase):
     def setUp(self):
         self.tty_net = tty_netconf(MagicMock())

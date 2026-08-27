@@ -2,15 +2,15 @@ __author__ = "Rick Sherman, Nitin Kumar"
 __credits__ = "Jeremy Schulman"
 
 import unittest
-from nose.plugins.attrib import attr
-from mock import MagicMock, patch
+from unittest.mock import MagicMock, patch
+
+import nose2
 from jnpr.junos import Device
 from jnpr.junos.factory.view import View
 from jnpr.junos.op.phyport import PhyPortStatsTable, PhyPortStatsView
 from lxml import etree
 
 
-@attr("unit")
 class TestFactoryView(unittest.TestCase):
     def setUp(self):
         self.dev = Device(

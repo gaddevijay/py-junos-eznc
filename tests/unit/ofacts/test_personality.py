@@ -2,14 +2,13 @@ __author__ = "Nitin Kumar, Rick Sherman"
 __credits__ = "Jeremy Schulman"
 
 import unittest
-from mock import patch
-from nose.plugins.attrib import attr
+from unittest.mock import patch
 
+import nose2
 from jnpr.junos import Device
 from jnpr.junos.ofacts.personality import facts_personality as personality
 
 
-@attr("unit")
 class TestPersonality(unittest.TestCase):
     @patch("jnpr.junos.device.warnings")
     def setUp(self, mock_warnings):

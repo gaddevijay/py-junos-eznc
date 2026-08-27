@@ -2,20 +2,20 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from jnpr.junos.utils.config import Config
-from nose.plugins.attrib import attr
-from mock import patch, MagicMock, call
-import re
-import sys
-import os
-from lxml import etree
-import six
-import socket
 
+import os
+import re
+import socket
+import sys
+from unittest.mock import MagicMock, call, patch
+
+import nose2
+import six
 from jnpr.junos.console import Console
 from jnpr.junos.transport.tty_netconf import tty_netconf
 from jnpr.junos.transport.tty_telnet import Terminal
-
+from jnpr.junos.utils.config import Config
+from lxml import etree
 
 if sys.version < "3":
     builtin_string = "__builtin__"
@@ -23,23 +23,32 @@ else:
     builtin_string = "builtins"
 
 
-@attr("unit")
 class TestConsole(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Save object state
+        cls.open = tty_netconf.open
+
+    @classmethod
+    def tearDownClass(cls):
+        # Revert object state
+        tty_netconf.open = cls.open
+
     @patch("jnpr.junos.transport.tty_telnet.Telnet._tty_open")
     @patch("jnpr.junos.transport.tty_telnet.telnetlib.Telnet.expect")
     @patch("jnpr.junos.transport.tty_telnet.Telnet.write")
     def setUp(self, mock_write, mock_expect, mock_open):
         tty_netconf.open = MagicMock()
         mock_expect.side_effect = [
-            (1, re.search("(?P<login>ogin:\s*$)", "login: "), six.b("\r\r\n ogin:")),
+            (1, re.search(r"(?P<login>ogin:\s*$)", "login: "), six.b("\r\r\n ogin:")),
             (
                 2,
-                re.search("(?P<passwd>assword:\s*$)", "password: "),
+                re.search(r"(?P<passwd>assword:\s*$)", "password: "),
                 six.b("\r\r\n password:"),
             ),
             (
                 3,
-                re.search("(?P<shell>%|#\s*$)", "junos % "),
+                re.search(r"(?P<shell>%|#\s*$)", "junos % "),
                 six.b("\r\r\nroot@device:~ # "),
             ),
         ]
@@ -78,10 +87,10 @@ class TestConsole(unittest.TestCase):
     def test_login_bad_password(self, mock_write, mock_expect, mock_open):
         tty_netconf.open = MagicMock()
         mock_expect.side_effect = [
-            (1, re.search("(?P<login>ogin:\s*$)", "login: "), six.b("\r\r\n ogin:")),
+            (1, re.search(r"(?P<login>ogin:\s*$)", "login: "), six.b("\r\r\n ogin:")),
             (
                 2,
-                re.search("(?P<passwd>assword:\s*$)", "password: "),
+                re.search(r"(?P<passwd>assword:\s*$)", "password: "),
                 six.b("\r\r\n password:"),
             ),
             (
@@ -101,15 +110,15 @@ class TestConsole(unittest.TestCase):
         tty_netconf.open = MagicMock()
 
         mock_expect.side_effect = [
-            (1, re.search("(?P<login>ogin:\s*$)", "login: "), six.b("\r\r\n ogin:")),
+            (1, re.search(r"(?P<login>ogin:\s*$)", "login: "), six.b("\r\r\n ogin:")),
             (
                 2,
-                re.search("(?P<passwd>assword:\s*$)", "password: "),
+                re.search(r"(?P<passwd>assword:\s*$)", "password: "),
                 six.b("\r\r\n password:"),
             ),
             (
                 3,
-                re.search("(?P<shell>%|#\s*$)", "junos % "),
+                re.search(r"(?P<shell>%|#\s*$)", "junos % "),
                 six.b("\r\r\nroot@device:~ # "),
             ),
         ]
@@ -153,7 +162,7 @@ class TestConsole(unittest.TestCase):
     @patch("jnpr.junos.console.Console._tty_login")
     def test_console_tty_open_err(self, mock_login, mock_telnet):
         with patch(
-            "jnpr.junos.transport.tty_telnet." "telnetlib.Telnet.open"
+            "jnpr.junos.transport.tty_telnet.telnetlib.Telnet.open"
         ) as mock_open:
             mock_telnet.RETRY_OPEN = 1
             mock_login.side_effect = ValueError
@@ -198,7 +207,7 @@ class TestConsole(unittest.TestCase):
 
         mock_fact_list.__iter__.return_value = [facts_session]
         self.dev.facts_refresh()
-        self.assertEqual(mock_rpc.call_count, 8)
+        self.assertEqual(mock_rpc.call_count, 9)
 
     @patch("jnpr.junos.console.Console._tty_login")
     @patch("jnpr.junos.console.FACT_LIST")
@@ -217,11 +226,13 @@ class TestConsole(unittest.TestCase):
                 "2RE": False,
                 "RE_hw_mi": False,
                 "ifd_style": "CLASSIC",
-                "serialnumber": "UNKNOWN",
+                "jnu_satellite": False,
                 "model": "UNKNOWN",
-                "vc_capable": False,
-                "switch_style": "NONE",
                 "personality": "UNKNOWN",
+                "satellites_info": {},
+                "serialnumber": "UNKNOWN",
+                "switch_style": "NONE",
+                "vc_capable": False,
             },
         )
 

@@ -1,19 +1,25 @@
-from copy import deepcopy
 import logging
+from copy import deepcopy
+from typing import Optional
+
+from jnpr.junos.decorators import checkSAXParserDecorator
+
+# local
+from jnpr.junos.factory.table import Table
+from jnpr.junos.jxml import remove_namespaces, remove_namespaces_and_spaces
 
 # 3rd-party
 from lxml import etree
 from lxml.builder import E
 
-# local
-from jnpr.junos.factory.table import Table
-from jnpr.junos.jxml import remove_namespaces, remove_namespaces_and_spaces
-from jnpr.junos.decorators import checkSAXParserDecorator
-
 logger = logging.getLogger("jnpr.junos.factory.optable")
 
 
 class OpTable(Table):
+    # Default RPC and args placeholders to satisfy type checkers; subclasses override.
+    GET_ARGS: dict = {}
+    GET_RPC: str = ""
+    GET_KEY: Optional[str] = None
     # -------------------------------------------------------------------------
     # PUBLIC METHODS
     # -------------------------------------------------------------------------
@@ -67,7 +73,8 @@ class OpTable(Table):
                 filter_xml = generate_sax_parser_input(self)
                 rpc_args["filter_xml"] = filter_xml
             except Exception as ex:
-                logger.debug("Not able to create SAX parser input due to " "'%s'" % ex)
+                logger.debug("Not able to create SAX parser input due to '%s'" % ex)
+            self.D.transform = lambda: remove_namespaces_and_spaces
 
         self.D.transform = lambda: remove_namespaces_and_spaces
         rpc_args.update(self.GET_ARGS)  # copy default args
@@ -76,8 +83,10 @@ class OpTable(Table):
             rpc_args.update(kvargs.pop("args"))
         rpc_args.update(kvargs)  # copy caller provided args
 
-        if hasattr(self, "GET_KEY") and argkey is not None:
-            rpc_args.update({self.GET_KEY: argkey})
+        if argkey is not None:
+            get_key = getattr(self, "GET_KEY", None)
+            if get_key is not None:
+                rpc_args.update({get_key: argkey})
 
         # execute the Junos RPC to retrieve the table
         self.xml = getattr(self.RPC, self.GET_RPC)(**rpc_args)

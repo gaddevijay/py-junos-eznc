@@ -1,0 +1,19 @@
+<rpc-reply xmlns:junos="http://xml.juniper.net/junos/26.3I20260309_1406_babud/junos">
+    <satellite-device-information>
+        <satellite-device>
+            <satellite-mgmt-ip>satellite_one</satellite-mgmt-ip>
+            <chassis-inventory>
+                <chassis>
+                    <name>Chassis</name>
+                    <serial-number>VM6A2F86A07D</serial-number>
+                    <description>MX960</description>
+                    <chassis-module>
+                        <name>Routing Engine 0</name>
+                        <serial-number>574b94ec-68</serial-number>
+                        <description>RE-VMX</description>
+                    </chassis-module>
+                </chassis>
+            </chassis-inventory>
+        </satellite-device>
+    </satellite-device-information>
+</rpc-reply>

@@ -5,12 +5,13 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from nose.plugins.attrib import attr
-from mock import MagicMock, patch
+
+from unittest.mock import MagicMock, patch
+
+import nose2
 from jnpr.junos.transport.tty_ssh import SSH
 
 
-@attr("unit")
 class TestTTYSSH(unittest.TestCase):
     @patch("jnpr.junos.transport.tty_ssh.paramiko")
     def setUp(self, mock_paramiko):

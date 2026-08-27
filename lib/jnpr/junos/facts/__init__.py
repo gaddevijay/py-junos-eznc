@@ -31,6 +31,7 @@ NOTE: The dictionary key for each available fact is guaranteed to exist. If
 The following dictionary keys represent the available facts and their meaning:
 
 """
+
 import sys
 
 import jnpr.junos.facts.current_re
@@ -41,12 +42,14 @@ import jnpr.junos.facts.get_chassis_cluster_status
 import jnpr.junos.facts.get_chassis_inventory
 import jnpr.junos.facts.get_route_engine_information
 import jnpr.junos.facts.get_software_information
+import jnpr.junos.facts.get_jnu_satellites_information
 import jnpr.junos.facts.get_virtual_chassis_information
 import jnpr.junos.facts.ifd_style
 import jnpr.junos.facts.iri_mapping
+import jnpr.junos.facts.is_linux
 import jnpr.junos.facts.personality
 import jnpr.junos.facts.swver
-import jnpr.junos.facts.is_linux
+import jnpr.junos.facts.vmhost
 
 
 def _build_fact_callbacks_and_doc_strings():
