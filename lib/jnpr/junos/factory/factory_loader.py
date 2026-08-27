@@ -389,6 +389,7 @@ class FactoryLoader(object):
                 self._item_views.append(k)
 
     def load(self, catalog_dict, envrion={}):
+
         # load the yaml data and extract the item names.  these names will
         # become the new class definitions
 

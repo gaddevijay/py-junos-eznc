@@ -3,12 +3,9 @@ import re
 import datetime
 from jnpr.junos.utils.ssh_client import open_ssh_client
 import subprocess
-import six
-from threading import Thread
-import time
 
 _JUNOS_PROMPT = "> "
-_SHELL_PROMPT = r"(%|#|\$)\s"
+_SHELL_PROMPT = "(%|#|\$)\s"
 _SELECT_WAIT = 0.1
 _RECVSZ = 1024
 
@@ -26,7 +23,7 @@ class StartShell(object):
 
     """
 
-    def __init__(self, nc, timeout=30, shell_type="csh"):
+    def __init__(self, nc, timeout=30):
         """
         Utility Constructor
 
@@ -40,11 +37,6 @@ class StartShell(object):
         self._client = None
         self._chan = None
         self.ON_JUNOS = self._nc.__class__.ON_JUNOS
-        self.shell_type = shell_type
-
-    def write_stdin(self, stdin, data):
-        stdin.write(data.encode("utf-8"))
-        stdin.flush()
 
     def wait_for(self, this=_SHELL_PROMPT, timeout=0, sleep=0):
         """
@@ -77,8 +69,6 @@ class StartShell(object):
                 rd, wr, err = select([chan], [], [], _SELECT_WAIT)
                 if rd:
                     data = chan.recv(_RECVSZ)
-                else:
-                    continue
             if sleep:
                 time.sleep(sleep)
             if isinstance(data, bytes):
@@ -97,11 +87,7 @@ class StartShell(object):
         """
         if self.ON_JUNOS is True:
             data += " && echo ']]>]]>' \n"
-            self._chan.stdin.write(data.encode("utf-8"))
-            self.t = Thread(target=self.write_stdin, args=(self._chan.stdin, data))
-            self.t.daemon = True  # thread dies with the program
-            self.t.start()
-            return
+            self._chan.stdin.write(data)
         else:
             self._chan.send(data)
             self._chan.send("\n")
@@ -114,12 +100,10 @@ class StartShell(object):
         """
         if self.ON_JUNOS is True:
             self._chan = subprocess.Popen(
-                ["cli", "start", "shell", self.shell_type],
+                ["cli", "start", "shell"],
                 shell=False,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                close_fds=1,
-                bufsize=1,
             )
         else:
             self._client = open_ssh_client(dev=self._nc)
@@ -127,7 +111,7 @@ class StartShell(object):
 
             got = self.wait_for(r"(%|>|#|\$)")
             if got[-1].endswith(_JUNOS_PROMPT):
-                self.send("start shell " + self.shell_type)
+                self.send("start shell")
                 self.wait_for(_SHELL_PROMPT)
 
     def close(self):
@@ -187,7 +171,7 @@ class StartShell(object):
             got = "".join(self.wait_for(this, timeout, sleep=sleep))
             self.last_ok = False
             if this is None:
-                self.last_ok = got != ""
+                self.last_ok = got is not ""
             elif this != _SHELL_PROMPT:
                 self.last_ok = re.search(r"{}\s?$".format(this), got) is not None
             elif re.search(r"{}\s?$".format(_SHELL_PROMPT), got) is not None:

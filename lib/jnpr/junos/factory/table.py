@@ -245,9 +245,7 @@ class Table(object):
             fname += "_%s" % append
 
         path = fname + fext
-        with open(path, "wb+") as f:
-            pass
-        return etree.ElementTree(self.xml).write(path)
+        return etree.ElementTree(self.xml).write(open(path, "wb"))
 
     def to_json(self):
         """
