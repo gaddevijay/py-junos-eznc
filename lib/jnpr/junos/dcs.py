@@ -151,7 +151,6 @@ class DCS(_Connection):
             command=[rpc_cmd],
             device_info=self._dev_info,
             telemetry=True,
-            timeout=self._timeout,
         )
         res = self._grpc_conn_stub.Op(
             request=request_rpc,
