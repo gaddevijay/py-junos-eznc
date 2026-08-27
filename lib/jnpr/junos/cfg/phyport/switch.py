@@ -8,6 +8,7 @@ from jnpr.junos.cfg.phyport.base import PhyPortBase
 
 
 class PhyPortSwitch(PhyPortBase):
+
     PORT_SPEED = {
         "auto": "auto-negotiation",
         "10m": "ethernet-10m",

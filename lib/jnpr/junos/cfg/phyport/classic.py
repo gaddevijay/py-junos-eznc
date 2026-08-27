@@ -8,6 +8,7 @@ from jnpr.junos.cfg.phyport.base import PhyPortBase
 
 
 class PhyPortClassic(PhyPortBase):
+
     # -----------------------------------------------------------------------
     # XML readers
     # -----------------------------------------------------------------------

@@ -13,6 +13,7 @@ P_JUNOS_ACTIVE = "_active"
 
 
 class Resource(object):
+
     PROPERTIES = [P_JUNOS_EXISTS, P_JUNOS_ACTIVE]
 
     def __init__(self, junos, namevar=None, **kvargs):
