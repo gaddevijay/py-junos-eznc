@@ -430,7 +430,7 @@ class _Connection(object):
                 if re_name is None:
                     # Still haven't figured it out. Is this a bsys?
                     for re_state in self.facts["current_re"]:
-                        match = re.search("^re\d+$", re_state)
+                        match = re.search(r"^re\d+$", re_state)
                         if match:
                             re_string = "bsys-" + match.group(0)
                             if re_string in self.facts["hostname_info"].keys():
@@ -854,6 +854,9 @@ class _Connection(object):
             raise EzErrors.RpcError(cmd=rpc_cmd_e, rsp=rsp, errs=ex)
         # Something unexpected happened - raise it up
         except Exception as err:
+            # TODO:
+            if isinstance(err, EzErrors.OCTermProducer):
+                raise err
             warnings.warn(
                 "An unknown exception occurred - please report.", RuntimeWarning
             )
@@ -879,7 +882,7 @@ class _Connection(object):
                 except ValueError as ex:
                     # when data is {}{.*} types
                     if str(ex).startswith("Extra data"):
-                        return json.loads(re.sub("\s?{\s?}\s?", "", rpc_rsp_e.text))
+                        return json.loads(re.sub(r"\s?{\s?}\s?", "", rpc_rsp_e.text))
                     else:
                         raise JSONLoadError(ex, rpc_rsp_e.text)
             else:
@@ -906,7 +909,7 @@ class _Connection(object):
             #    protocol: operation-failed
             #    error: device asdf not found
             # </rpc-reply>
-            if rpc_rsp_e.text is not None and rpc_rsp_e.text.strip() is not "":
+            if rpc_rsp_e.text is not None and rpc_rsp_e.text.strip() != "":
                 return rpc_rsp_e
             # no children, so assume it means we are OK
             return True
@@ -1112,6 +1115,11 @@ class Device(_Connection):
             instance = object.__new__(DCS, *args, **kwargs)
             instance.__init__(**kwargs)
             return instance
+        elif kwargs.get("mode") == "oc-term":
+            from jnpr.junos.octerm import OCTerm
+            instance = object.__new__(OCTerm, *args, **kwargs)
+            instance.__init__(**kwargs)
+            return instance
         elif (
             kwargs.get("port") in [23, "23"]
             or kwargs.get("mode")
@@ -1223,6 +1231,10 @@ class Device(_Connection):
             *OPTIONAL* parse XML with very deep trees and long text content.
             default is ``False``.
 
+        :param bool look_for_keys:
+            *OPTIONAL* To disable public key authentication.
+            default is ``None``.
+
         """
 
         # ----------------------------------------
@@ -1239,7 +1251,8 @@ class Device(_Connection):
         self._fact_style = kvargs.get("fact_style", "new")
         self._use_filter = kvargs.get("use_filter", False)
         self._huge_tree = kvargs.get("huge_tree", False)
-        self._conn_open_timeout = kvargs.get("conn_open_timeout", None)
+        self._conn_open_timeout = kvargs.get("conn_open_timeout", 30)
+        self._look_for_keys = kvargs.get("look_for_keys", None)
         if self._fact_style != "new":
             warnings.warn(
                 "fact-style %s will be removed in a future "
@@ -1350,7 +1363,7 @@ class Device(_Connection):
         """
 
         auto_probe = kvargs.get("auto_probe", self._auto_probe)
-        if auto_probe is not 0:
+        if auto_probe != 0:
             if not self.probe(auto_probe):
                 raise EzErrors.ProbeError(self)
 
@@ -1366,6 +1379,13 @@ class Device(_Connection):
                 (self._auth_password is None) and (self._ssh_private_key_file is None)
             )
 
+            # option to disable ncclient transport ssh authentication
+            # using public keys look_for_keys=False
+            if self._look_for_keys is None:
+                look_for_keys = True
+            else:
+                look_for_keys = self._look_for_keys
+
             # open connection using ncclient transport
             self._conn = netconf_ssh.connect(
                 host=self._hostname,
@@ -1376,6 +1396,7 @@ class Device(_Connection):
                 hostkey_verify=False,
                 key_filename=self._ssh_private_key_file,
                 allow_agent=allow_agent,
+                look_for_keys=look_for_keys,
                 ssh_config=self._sshconf_lkup(),
                 timeout=self._conn_open_timeout,
                 device_params={
