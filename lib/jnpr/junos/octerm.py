@@ -211,14 +211,15 @@ class OCTerm(_Connection):
             "requestID": req_id,
             "resource": self._dev_uuid,
             "id": self._dev_uuid,
-            "params": rpc_cmd,
+            "params": { 
+                "netconfCommand": rpc_cmd,
+                "fragment": True,
+            }
             "netconfCommand": rpc_cmd
         }
         
         if self._xslt != "":
-            kafka_cmd["params"] = {
-                "netconfCommand" : rpc_cmd,
-                "filterXSLT": self._xslt
+            kafka_cmd["params"]["filterXSLT"]: self._xslt
             }
         
         result = ""
